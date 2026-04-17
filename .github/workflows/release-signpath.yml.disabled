@@ -1,0 +1,151 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Release con firma SignPath Foundation (activar cuando SignPath apruebe)
+#
+# Pasos para activar:
+#   1. Aplicar en signpath.org/foundation con info de docs/SIGNPATH_APPLICATION.md
+#   2. Esperar aprobación (días-semanas)
+#   3. SignPath crea el organization + project y te da los IDs
+#   4. Configurar GitHub Secrets:
+#        - SIGNPATH_ORGANIZATION_ID
+#        - SIGNPATH_PROJECT_SLUG    (ej: "audiopac")
+#        - SIGNPATH_SIGNING_POLICY_SLUG  (ej: "release-signing")
+#        - SIGNPATH_API_TOKEN       (si no se usa OIDC trust relationship)
+#   5. Renombrar este archivo a release.yml (reemplazando el actual)
+# ─────────────────────────────────────────────────────────────────────────────
+
+name: Release (SignPath)
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  id-token: write   # Para OIDC con SignPath
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Read version
+        run: echo "APP_VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_ENV
+      - name: Install deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev libayatana-appindicator3-dev librsvg2-dev patchelf
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+      - run: pnpm install --frozen-lockfile
+      - name: Build Tauri
+        run: pnpm tauri build --bundles appimage
+      - name: Prepare artifacts
+        run: |
+          mkdir -p artifacts
+          cp src-tauri/target/release/audiopac artifacts/AudioPAC-v${APP_VERSION}-linux-x86_64
+          chmod +x artifacts/AudioPAC-v${APP_VERSION}-linux-x86_64
+          for f in src-tauri/target/release/bundle/appimage/*.AppImage; do
+            [ -f "$f" ] && cp "$f" "artifacts/AudioPAC-v${APP_VERSION}-linux-x86_64.AppImage"
+          done
+          chmod +x artifacts/*.AppImage 2>/dev/null || true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: audiopac-linux
+          path: artifacts/*
+          retention-days: 30
+
+  build-windows-unsigned:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Read version
+        shell: pwsh
+        run: |
+          $version = "${env:GITHUB_REF_NAME}" -replace '^v', ''
+          echo "APP_VERSION=$version" >> $env:GITHUB_ENV
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+      - run: pnpm install --frozen-lockfile
+      - name: Build Tauri (unsigned)
+        run: pnpm tauri build --bundles nsis,msi
+      - name: Collect + rename unsigned artifacts
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path unsigned -Force | Out-Null
+          Get-ChildItem src-tauri/target/release/bundle/nsis/*.exe | ForEach-Object {
+            Copy-Item $_.FullName "unsigned/AudioPAC-v$env:APP_VERSION-windows-x86_64-setup.exe"
+          }
+          Get-ChildItem src-tauri/target/release/bundle/msi/*.msi | ForEach-Object {
+            Copy-Item $_.FullName "unsigned/AudioPAC-v$env:APP_VERSION-windows-x86_64.msi"
+          }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: audiopac-windows-unsigned
+          path: unsigned/*
+          retention-days: 1
+
+  sign-windows:
+    needs: build-windows-unsigned
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: audiopac-windows-unsigned
+          path: unsigned
+      - name: Submit to SignPath
+        uses: signpath/github-action-submit-signing-request@v1.1
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ secrets.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ secrets.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ secrets.SIGNPATH_SIGNING_POLICY_SLUG }}
+          github-artifact-id: ${{ needs.build-windows-unsigned.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: signed
+      - uses: actions/upload-artifact@v4
+        with:
+          name: audiopac-windows
+          path: signed/*
+          retention-days: 30
+
+  release:
+    needs: [build-linux, sign-windows]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - uses: actions/checkout@v4
+      - name: Read version
+        run: echo "APP_VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_ENV
+      - uses: actions/download-artifact@v4
+        with:
+          name: audiopac-linux
+          path: dist/linux
+      - uses: actions/download-artifact@v4
+        with:
+          name: audiopac-windows
+          path: dist/windows
+      - run: find dist -type f
+      - uses: softprops/action-gh-release@v2
+        with:
+          name: AudioPAC v${{ env.APP_VERSION }}
+          generate_release_notes: true
+          files: |
+            dist/linux/*
+            dist/windows/*
