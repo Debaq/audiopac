@@ -18,22 +18,61 @@
         "minWidth": 1024,
         "minHeight": 700,
         "resizable": true,
-        "fullscreen": false
+        "fullscreen": false,
+        "center": true,
+        "decorations": true,
+        "transparent": false
       }
     ],
     "security": {
-      "csp": null
+      "csp": null,
+      "assetProtocol": {
+        "enable": true,
+        "scope": ["**"]
+      }
     }
   },
   "bundle": {
     "active": true,
     "targets": "all",
+    "category": "Medical",
+    "shortDescription": "Evaluación del Procesamiento Auditivo Central",
+    "longDescription": "AudioPAC es un software clínico para la evaluación del Procesamiento Auditivo Central. Implementa los tests DPS (Duration Pattern Sequence) y PPS (Pitch Pattern Sequence) con parámetros totalmente configurables para uso clínico e investigación.",
+    "copyright": "Copyright © 2026 AudioPAC",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "linux": {
+      "deb": {
+        "depends": ["libwebkit2gtk-4.1-0", "libayatana-appindicator3-1"],
+        "section": "science"
+      },
+      "rpm": {
+        "depends": ["webkit2gtk4.1"]
+      },
+      "appimage": {
+        "bundleMediaFramework": false
+      }
+    },
+    "macOS": {
+      "minimumSystemVersion": "10.15",
+      "exceptionDomain": ""
+    },
+    "windows": {
+      "certificateThumbprint": null,
+      "digestAlgorithm": "sha256",
+      "timestampUrl": "",
+      "wix": {
+        "language": ["es-ES", "en-US"]
+      },
+      "nsis": {
+        "languages": ["Spanish", "English"],
+        "displayLanguageSelector": true
+      }
+    }
   }
 }
