@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Users, Activity, FileText, TrendingUp, ArrowUpRight, Waves, Clock } from 'lucide-react'
+import { Users, Activity, FileText, ArrowUpRight, Waves, Clock, CheckCircle2 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { listPatients } from '@/lib/db/patients'
 import { listAllSessions } from '@/lib/db/sessions'
@@ -41,7 +41,7 @@ export function DashboardPage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
         <StatCard icon={Users} label="Pacientes" value={String(stats.patients)} to="/pacientes" accent="wine" />
         <StatCard icon={Activity} label="Evaluaciones" value={String(stats.sessions)} to="/informes" accent="teal" />
-        <StatCard icon={TrendingUp} label="Rol" value={profile?.role ?? '—'} to="/dashboard" accent="gold" capitalize />
+        <StatCard icon={CheckCircle2} label="Completadas" value={String(stats.recent.filter(s => s.status === 'completed').length)} to="/informes" accent="gold" />
       </div>
 
       {/* Actions */}
@@ -123,14 +123,13 @@ export function DashboardPage() {
 }
 
 function StatCard({
-  icon: Icon, label, value, to, accent, capitalize,
+  icon: Icon, label, value, to, accent,
 }: {
   icon: typeof Users
   label: string
   value: string
   to: string
   accent: 'wine' | 'teal' | 'gold'
-  capitalize?: boolean
 }) {
   const accentClass = {
     wine: 'from-[var(--primary)]/20 to-[var(--primary)]/5 text-[var(--primary)]',
@@ -144,7 +143,7 @@ function StatCard({
         <div className="relative flex items-center justify-between">
           <div>
             <div className="text-xs font-bold uppercase tracking-widest text-[var(--muted-foreground)]">{label}</div>
-            <div className={`text-4xl font-black mt-1 ${capitalize ? 'capitalize' : ''}`}>{value}</div>
+            <div className="text-4xl font-black mt-1">{value}</div>
           </div>
           <Icon className="w-8 h-8 text-[var(--muted-foreground)]/30 group-hover:text-[var(--primary)] transition-colors" strokeWidth={1.5} />
         </div>
