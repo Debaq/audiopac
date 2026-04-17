@@ -4,7 +4,6 @@ import { Plus, User, Trash2, Lock, AudioLines } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Select } from '@/components/ui/select'
 import { useAuth } from '@/stores/auth'
 import { listProfiles, createProfile, deleteProfile, verifyPin } from '@/lib/db/profiles'
 import type { Profile } from '@/types'
@@ -127,7 +126,6 @@ export function ProfileSelectorPage() {
 
 function CreateProfileModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
   const [name, setName] = useState('')
-  const [role, setRole] = useState('fonoaudiologo')
   const [color, setColor] = useState(AVATAR_COLORS[0])
   const [pin, setPin] = useState('')
   const [saving, setSaving] = useState(false)
@@ -137,7 +135,7 @@ function CreateProfileModal({ onClose, onCreated }: { onClose: () => void; onCre
     if (!name.trim()) return
     setSaving(true)
     try {
-      await createProfile({ name: name.trim(), role: role as 'fonoaudiologo', color, pin: pin || null })
+      await createProfile({ name: name.trim(), color, pin: pin || null })
       onCreated()
     } finally {
       setSaving(false)
@@ -154,14 +152,6 @@ function CreateProfileModal({ onClose, onCreated }: { onClose: () => void; onCre
           <div>
             <Label htmlFor="name">Nombre</Label>
             <Input id="name" value={name} onChange={e => setName(e.target.value)} autoFocus required />
-          </div>
-          <div>
-            <Label htmlFor="role">Rol</Label>
-            <Select id="role" value={role} onChange={e => setRole(e.target.value)}>
-              <option value="fonoaudiologo">Fonoaudiólogo/a</option>
-              <option value="investigador">Investigador/a</option>
-              <option value="admin">Administrador/a</option>
-            </Select>
           </div>
           <div>
             <Label>Color</Label>

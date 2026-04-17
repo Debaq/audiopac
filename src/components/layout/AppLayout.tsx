@@ -76,7 +76,6 @@ export function AppLayout() {
               </div>
               <div className="flex-1 min-w-0">
                 <div className="text-sm font-semibold truncate leading-tight">{activeProfile.name}</div>
-                <div className="text-[10px] text-[var(--muted-foreground)] uppercase tracking-wider font-semibold">{activeProfile.role}</div>
               </div>
               <button
                 onClick={handleLogout}

@@ -113,7 +113,7 @@ export function EvaluationHomePage() {
           <div>
             <Label>Modo de respuesta</Label>
             <Select value={responseMode} onChange={e => setResponseMode(e.target.value as ResponseMode)}>
-              <option value="manual">Manual (fonoaudiólogo marca)</option>
+              <option value="manual">Manual (profesional marca)</option>
               <option value="verbal">Verbal (paciente verbaliza)</option>
               <option value="hummed">Tarareo</option>
             </Select>

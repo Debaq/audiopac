@@ -1,5 +1,5 @@
 import { getDb } from './client'
-import type { Profile, Role } from '@/types'
+import type { Profile } from '@/types'
 
 export async function listProfiles(): Promise<Profile[]> {
   const db = await getDb()
@@ -14,7 +14,6 @@ export async function getProfile(id: number): Promise<Profile | null> {
 
 export interface CreateProfileInput {
   name: string
-  role?: Role
   avatar?: string | null
   color?: string
   pin?: string | null
@@ -30,8 +29,8 @@ export async function createProfile(input: CreateProfileInput): Promise<number> 
   const db = await getDb()
   const pin_hash = input.pin ? await hashPin(input.pin) : null
   const res = await db.execute(
-    'INSERT INTO profiles (name, role, avatar, color, pin_hash) VALUES ($1, $2, $3, $4, $5)',
-    [input.name, input.role ?? 'fonoaudiologo', input.avatar ?? null, input.color ?? '#6B1F2E', pin_hash]
+    'INSERT INTO profiles (name, avatar, color, pin_hash) VALUES ($1, $2, $3, $4)',
+    [input.name, input.avatar ?? null, input.color ?? '#6B1F2E', pin_hash]
   )
   return res.lastInsertId ?? 0
 }
@@ -42,7 +41,6 @@ export async function updateProfile(id: number, input: Partial<CreateProfileInpu
   const params: unknown[] = []
   let i = 1
   if (input.name !== undefined) { updates.push(`name = $${i++}`); params.push(input.name) }
-  if (input.role !== undefined) { updates.push(`role = $${i++}`); params.push(input.role) }
   if (input.avatar !== undefined) { updates.push(`avatar = $${i++}`); params.push(input.avatar) }
   if (input.color !== undefined) { updates.push(`color = $${i++}`); params.push(input.color) }
   if (input.pin !== undefined) {

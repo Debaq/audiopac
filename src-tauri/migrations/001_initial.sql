@@ -2,7 +2,6 @@
 CREATE TABLE IF NOT EXISTS profiles (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
-    role TEXT NOT NULL DEFAULT 'fonoaudiologo',
     avatar TEXT,
     color TEXT DEFAULT '#6B1F2E',
     pin_hash TEXT,

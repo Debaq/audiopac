@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Plus, X, Play, Copy, Shuffle, GripVertical } from 'lucide-react'
+import { Plus, X, Play, Copy, Shuffle, GripVertical, Minus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { playSequence, ensureRunning } from '@/lib/audio/engine'
 import type { TestConfig } from '@/types'
@@ -65,6 +65,27 @@ export function SequenceBuilder({ sequences, onChange, config, patternLength, re
     onChange(copy)
   }
 
+  const appendTone = (seqIdx: number) => {
+    const copy = [...sequences]
+    copy[seqIdx] = sequences[seqIdx] + (tones[0] ?? 'L')
+    onChange(copy)
+  }
+
+  const popTone = (seqIdx: number) => {
+    const copy = [...sequences]
+    if (copy[seqIdx].length <= 1) return
+    copy[seqIdx] = sequences[seqIdx].slice(0, -1)
+    onChange(copy)
+  }
+
+  const removeToneAt = (seqIdx: number, pos: number) => {
+    const seq = sequences[seqIdx]
+    if (seq.length <= 1) return
+    const copy = [...sequences]
+    copy[seqIdx] = seq.substring(0, pos) + seq.substring(pos + 1)
+    onChange(copy)
+  }
+
   const playSeq = async (seq: string) => {
     await ensureRunning()
     await playSequence(seq, config)
@@ -124,12 +145,37 @@ export function SequenceBuilder({ sequences, onChange, config, patternLength, re
                   readOnly={readOnly}
                   tones={tones}
                   onCycle={(next) => updateToneAt(i, pos, next)}
+                  onRemove={seq.length > 1 ? () => removeToneAt(i, pos) : undefined}
                 />
               )
             })}
+            {!readOnly && (
+              <div className="flex flex-col gap-1 ml-1">
+                <button
+                  type="button"
+                  onClick={() => appendTone(i)}
+                  className="w-7 h-7 rounded-md border-2 border-dashed border-[var(--border)] hover:border-[var(--primary)] hover:text-[var(--primary)] text-[var(--muted-foreground)] flex items-center justify-center transition-colors"
+                  title="Añadir tono al final"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                </button>
+                {seq.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => popTone(i)}
+                    className="w-7 h-7 rounded-md border-2 border-dashed border-[var(--border)] hover:border-[var(--destructive)] hover:text-[var(--destructive)] text-[var(--muted-foreground)] flex items-center justify-center transition-colors"
+                    title="Quitar último tono"
+                  >
+                    <Minus className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+            )}
           </div>
 
-          <code className="text-xs font-mono text-[var(--muted-foreground)] px-2 ml-auto">{seq}</code>
+          <code className="text-xs font-mono text-[var(--muted-foreground)] px-2 ml-auto">
+            {seq} <span className="opacity-50">({seq.length})</span>
+          </code>
 
           <div className="flex gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
             <button onClick={() => playSeq(seq)} className="p-1.5 rounded hover:bg-[var(--primary)]/10 text-[var(--primary)]" title="Reproducir">
@@ -154,7 +200,7 @@ export function SequenceBuilder({ sequences, onChange, config, patternLength, re
           <Button size="sm" variant="outline" onClick={addSequence}><Plus className="w-3 h-3" /> Agregar</Button>
           <Button size="sm" variant="outline" onClick={addRandom}><Shuffle className="w-3 h-3" /> Aleatoria</Button>
           <div className="ml-auto text-xs text-[var(--muted-foreground)] self-center">
-            {sequences.length} secuencia{sequences.length !== 1 ? 's' : ''} · tamaño {patternLength}
+            {sequences.length} secuencia{sequences.length !== 1 ? 's' : ''} · longitud por defecto {patternLength}
           </div>
         </div>
       )}
@@ -163,7 +209,7 @@ export function SequenceBuilder({ sequences, onChange, config, patternLength, re
 }
 
 function ToneBlock({
-  tone, label, color, width, height, readOnly, tones, onCycle,
+  tone, label, color, width, height, readOnly, tones, onCycle, onRemove,
 }: {
   tone: string
   label: string
@@ -173,27 +219,44 @@ function ToneBlock({
   readOnly?: boolean
   tones: string[]
   onCycle: (next: string) => void
+  onRemove?: () => void
 }) {
-  const handleClick = () => {
+  const handleClick = (e: React.MouseEvent) => {
     if (readOnly) return
+    if (e.shiftKey && onRemove) { onRemove(); return }
     const idx = tones.indexOf(tone)
     const next = tones[(idx + 1) % tones.length]
     onCycle(next)
   }
   return (
-    <button
-      type="button"
-      onClick={handleClick}
-      disabled={readOnly}
-      style={{ width, height, background: color }}
-      className={cn(
-        'rounded-md flex items-center justify-center text-white font-bold text-sm shadow-md transition-transform',
-        !readOnly && 'hover:scale-110 hover:shadow-lg cursor-pointer',
-        readOnly && 'cursor-default'
+    <div className="relative group">
+      <button
+        type="button"
+        onClick={handleClick}
+        onContextMenu={(e) => { e.preventDefault(); if (!readOnly && onRemove) onRemove() }}
+        disabled={readOnly}
+        style={{ width, height, background: color }}
+        className={cn(
+          'rounded-md flex items-center justify-center text-white font-bold text-sm shadow-md transition-transform',
+          !readOnly && 'hover:scale-110 hover:shadow-lg cursor-pointer',
+          readOnly && 'cursor-default'
+        )}
+        title={readOnly ? `${tone} - ${label}` : `${tone} - ${label} (click: cambiar · shift+click o click derecho: eliminar)`}
+      >
+        {tone}
+      </button>
+      {!readOnly && onRemove && (
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); onRemove() }}
+          className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-[var(--destructive)] text-white opacity-0 group-hover:opacity-100 flex items-center justify-center shadow transition-opacity"
+          title="Eliminar tono"
+        >
+          <svg className="w-2.5 h-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round">
+            <path d="M18 6 6 18M6 6l12 12" />
+          </svg>
+        </button>
       )}
-      title={`${tone} - ${label} (click para cambiar)`}
-    >
-      {tone}
-    </button>
+    </div>
   )
 }

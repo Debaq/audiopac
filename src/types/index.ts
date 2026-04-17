@@ -1,4 +1,3 @@
-export type Role = 'fonoaudiologo' | 'investigador' | 'admin'
 export type Ear = 'left' | 'right' | 'binaural'
 export type ResponseMode = 'verbal' | 'hummed' | 'manual'
 export type TestType = 'DPS' | 'PPS' | 'CUSTOM'
@@ -8,7 +7,6 @@ export type Phase = 'practice' | 'test'
 export interface Profile {
   id: number
   name: string
-  role: Role
   avatar: string | null
   color: string
   pin_hash: string | null

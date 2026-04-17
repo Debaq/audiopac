@@ -18,7 +18,7 @@ Implementa los tests clínicos estándar:
 
 ## Caracteristicas
 
-- Multi-perfil estilo Netflix (varios fonoaudiologos/as, PIN opcional)
+- Multi-perfil estilo Netflix (varios profesionales, PIN opcional)
 - CRUD de pacientes con historial
 - Motor de audio con envelope, ISI, IRI, canal mono/binaural, nivel dB configurable
 - Editor de tests: crear secuencias y parametros para investigacion

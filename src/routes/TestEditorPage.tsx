@@ -240,8 +240,9 @@ export function TestEditorPage() {
             <Input type="number" value={config.duration_ms ?? ''} onChange={e => setConfig({ ...config, duration_ms: Number(e.target.value) })} disabled={isStandard} />
           </div>
           <div>
-            <Label>Longitud patrón</Label>
-            <Input type="number" value={config.pattern_length} onChange={e => setConfig({ ...config, pattern_length: Number(e.target.value) })} disabled={isStandard} />
+            <Label>Longitud por defecto</Label>
+            <Input type="number" min={1} value={config.pattern_length} onChange={e => setConfig({ ...config, pattern_length: Math.max(1, Number(e.target.value)) })} disabled={isStandard} />
+            <p className="text-[10px] text-[var(--muted-foreground)] mt-0.5">Sólo al crear nuevas. Cada secuencia puede tener longitud distinta.</p>
           </div>
           <div>
             <Label>ISI (ms) - entre tonos</Label>
