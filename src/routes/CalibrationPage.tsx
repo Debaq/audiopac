@@ -58,9 +58,9 @@ export function CalibrationPage() {
   const refreshDevices = async () => {
     const outs = await listAudioOutputs()
     setDevices(outs)
-    setNeedsPermission(outs.length > 0 && outs.every(d => !d.label || d.label.startsWith('(sin etiqueta')))
-    if (!deviceId && outs.length > 0) {
-      setDeviceId(outs.find(d => d.deviceId === 'default')?.deviceId ?? outs[0].deviceId)
+    setNeedsPermission(outs.some(d => d.label.startsWith('(sin etiqueta')))
+    if (outs.length > 0) {
+      setDeviceId(prev => prev || (outs.find(d => d.deviceId === 'default')?.deviceId ?? outs[0].deviceId))
     }
   }
 
