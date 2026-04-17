@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, User, Trash2, Lock } from 'lucide-react'
+import { Plus, User, Trash2, Lock, AudioLines } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -53,15 +53,20 @@ export function ProfileSelectorPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[var(--background)] via-[var(--secondary)] to-[var(--background)] flex flex-col items-center justify-center p-8">
-      <div className="max-w-4xl w-full">
+    <div className="min-h-screen bg-[var(--background)] bg-waves flex flex-col items-center justify-center p-8 relative overflow-hidden">
+      {/* Decorative wave circles */}
+      <div className="absolute top-10 -left-20 w-96 h-96 rounded-full bg-gradient-to-br from-[var(--primary)]/5 to-transparent blur-3xl" />
+      <div className="absolute bottom-10 -right-20 w-96 h-96 rounded-full bg-gradient-to-br from-[var(--accent)]/10 to-transparent blur-3xl" />
+
+      <div className="max-w-4xl w-full relative z-10">
         <div className="text-center mb-12">
-          <div className="inline-flex items-center gap-3 mb-4">
-            <div className="w-16 h-16 rounded-2xl bg-[var(--primary)] flex items-center justify-center text-[var(--primary-foreground)] text-3xl font-bold shadow-lg">
-              A
+          <div className="inline-flex items-center gap-4 mb-6">
+            <div className="w-16 h-16 rounded-2xl brand-gradient flex items-center justify-center text-white shadow-2xl shadow-[var(--primary)]/30">
+              <AudioLines className="w-8 h-8" strokeWidth={2.5} />
             </div>
           </div>
-          <h1 className="text-5xl font-bold mb-3" style={{ color: 'var(--primary)' }}>AudioPAC</h1>
+          <h1 className="text-6xl font-black mb-2 brand-gradient-text tracking-tight">AudioPAC</h1>
+          <div className="wave-divider max-w-[120px] mx-auto mb-4" />
           <p className="text-[var(--muted-foreground)] text-lg">¿Quién está evaluando hoy?</p>
         </div>
 

@@ -1,15 +1,17 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Play, Save, Trash2 } from 'lucide-react'
+import { ArrowLeft, Play, Save, Trash2, LayoutGrid, FileText } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
+import { SequenceBuilder } from '@/components/SequenceBuilder'
 import { getTemplate, createTemplate, updateTemplate } from '@/lib/db/templates'
 import { playTonePreview, playSequence, ensureRunning } from '@/lib/audio/engine'
 import { useAuth } from '@/stores/auth'
+import { cn } from '@/lib/utils'
 import type { TestType, TestConfig } from '@/types'
 
 const BLANK_CONFIG: TestConfig = {
@@ -44,6 +46,9 @@ export function TestEditorPage() {
   const [saving, setSaving] = useState(false)
   const [practiceText, setPracticeText] = useState('')
   const [testText, setTestText] = useState('')
+  const [mode, setMode] = useState<'visual' | 'texto'>('visual')
+  const [practiceSeqs, setPracticeSeqs] = useState<string[]>([])
+  const [testSeqs, setTestSeqs] = useState<string[]>([])
 
   useEffect(() => {
     if (!tid) return
@@ -57,8 +62,29 @@ export function TestEditorPage() {
       setConfig(t.config)
       setPracticeText(t.config.practice_sequences.join('\n'))
       setTestText(t.config.test_sequences.join('\n'))
+      setPracticeSeqs(t.config.practice_sequences)
+      setTestSeqs(t.config.test_sequences)
     })
   }, [tid])
+
+  const parsedPractice = useMemo(
+    () => practiceText.split(/\s+/).map(s => s.trim().toUpperCase()).filter(Boolean),
+    [practiceText]
+  )
+  const parsedTest = useMemo(
+    () => testText.split(/\s+/).map(s => s.trim().toUpperCase()).filter(Boolean),
+    [testText]
+  )
+
+  const syncTextToVisual = () => {
+    setPracticeSeqs(parsedPractice)
+    setTestSeqs(parsedTest)
+  }
+
+  const syncVisualToText = () => {
+    setPracticeText(practiceSeqs.join('\n'))
+    setTestText(testSeqs.join('\n'))
+  }
 
   const updateTone = (key: string, field: keyof TestConfig['tones'][string], value: string | number) => {
     setConfig({
@@ -102,10 +128,12 @@ export function TestEditorPage() {
     if (!name.trim() || !code.trim()) { alert('Nombre y código obligatorios'); return }
     setSaving(true)
     try {
+      const practice = mode === 'visual' ? practiceSeqs : parsedPractice
+      const test = mode === 'visual' ? testSeqs : parsedTest
       const fullConfig: TestConfig = {
         ...config,
-        practice_sequences: practiceText.split(/\s+/).map(s => s.trim().toUpperCase()).filter(Boolean),
-        test_sequences: testText.split(/\s+/).map(s => s.trim().toUpperCase()).filter(Boolean),
+        practice_sequences: practice,
+        test_sequences: test,
       }
       if (tid) {
         await updateTemplate(tid, { code, name, test_type: testType, description, config: fullConfig })
@@ -242,30 +270,88 @@ export function TestEditorPage() {
         </CardContent>
       </Card>
 
-      <Card className="mb-4">
-        <CardHeader><CardTitle>Secuencias de práctica</CardTitle></CardHeader>
-        <CardContent>
-          <Textarea value={practiceText} onChange={e => setPracticeText(e.target.value)} rows={6} placeholder="Una secuencia por línea, ej: LCC" disabled={isStandard} className="font-mono" />
-          <p className="text-xs text-[var(--muted-foreground)] mt-2">
-            {practiceText.split(/\s+/).filter(Boolean).length} secuencias
-          </p>
-        </CardContent>
-      </Card>
+      <div className="flex items-center justify-between mb-3 px-1">
+        <h2 className="text-lg font-bold">Secuencias</h2>
+        <div className="flex gap-1 p-1 bg-[var(--secondary)] rounded-lg">
+          <button
+            onClick={() => { if (mode === 'texto') syncTextToVisual(); setMode('visual') }}
+            className={cn(
+              'px-3 py-1.5 rounded-md text-sm font-medium flex items-center gap-2 transition-colors',
+              mode === 'visual' ? 'bg-[var(--card)] text-[var(--foreground)] shadow-sm' : 'text-[var(--muted-foreground)]'
+            )}
+          >
+            <LayoutGrid className="w-4 h-4" /> Visual
+          </button>
+          <button
+            onClick={() => { if (mode === 'visual') syncVisualToText(); setMode('texto') }}
+            className={cn(
+              'px-3 py-1.5 rounded-md text-sm font-medium flex items-center gap-2 transition-colors',
+              mode === 'texto' ? 'bg-[var(--card)] text-[var(--foreground)] shadow-sm' : 'text-[var(--muted-foreground)]'
+            )}
+          >
+            <FileText className="w-4 h-4" /> Texto
+          </button>
+        </div>
+      </div>
 
-      <Card className="mb-4">
-        <CardHeader><CardTitle>Secuencias del test</CardTitle></CardHeader>
-        <CardContent>
-          <Textarea value={testText} onChange={e => setTestText(e.target.value)} rows={10} placeholder="Una secuencia por línea" disabled={isStandard} className="font-mono" />
-          <p className="text-xs text-[var(--muted-foreground)] mt-2">
-            {testText.split(/\s+/).filter(Boolean).length} secuencias
-          </p>
-          {testText.split(/\s+/).filter(Boolean)[0] && (
-            <Button variant="outline" size="sm" className="mt-2" onClick={() => previewSequence(testText.split(/\s+/).filter(Boolean)[0])}>
-              <Play className="w-3 h-3" /> Previsualizar primera
-            </Button>
-          )}
-        </CardContent>
-      </Card>
+      {mode === 'visual' ? (
+        <>
+          <Card className="mb-4">
+            <CardHeader><CardTitle className="flex items-center justify-between">
+              <span>Secuencias de práctica</span>
+              <span className="text-sm font-normal text-[var(--muted-foreground)]">{practiceSeqs.length}</span>
+            </CardTitle></CardHeader>
+            <CardContent>
+              <SequenceBuilder
+                sequences={practiceSeqs}
+                onChange={setPracticeSeqs}
+                config={config}
+                patternLength={config.pattern_length}
+                readOnly={isStandard}
+              />
+            </CardContent>
+          </Card>
+
+          <Card className="mb-4">
+            <CardHeader><CardTitle className="flex items-center justify-between">
+              <span>Secuencias del test</span>
+              <span className="text-sm font-normal text-[var(--muted-foreground)]">{testSeqs.length}</span>
+            </CardTitle></CardHeader>
+            <CardContent>
+              <SequenceBuilder
+                sequences={testSeqs}
+                onChange={setTestSeqs}
+                config={config}
+                patternLength={config.pattern_length}
+                readOnly={isStandard}
+              />
+            </CardContent>
+          </Card>
+        </>
+      ) : (
+        <>
+          <Card className="mb-4">
+            <CardHeader><CardTitle>Secuencias de práctica</CardTitle></CardHeader>
+            <CardContent>
+              <Textarea value={practiceText} onChange={e => setPracticeText(e.target.value)} rows={6} placeholder="Una secuencia por línea, ej: LCC" disabled={isStandard} className="font-mono" />
+              <p className="text-xs text-[var(--muted-foreground)] mt-2">{parsedPractice.length} secuencias</p>
+            </CardContent>
+          </Card>
+
+          <Card className="mb-4">
+            <CardHeader><CardTitle>Secuencias del test</CardTitle></CardHeader>
+            <CardContent>
+              <Textarea value={testText} onChange={e => setTestText(e.target.value)} rows={10} placeholder="Una secuencia por línea" disabled={isStandard} className="font-mono" />
+              <p className="text-xs text-[var(--muted-foreground)] mt-2">{parsedTest.length} secuencias</p>
+              {parsedTest[0] && (
+                <Button variant="outline" size="sm" className="mt-2" onClick={() => previewSequence(parsedTest[0])}>
+                  <Play className="w-3 h-3" /> Previsualizar primera
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+        </>
+      )}
 
       {!isStandard && (
         <Button size="lg" className="w-full" onClick={save} disabled={saving}>
