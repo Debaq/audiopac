@@ -1,8 +1,8 @@
-# Solicitud a SignPath Foundation
+# SignPath Foundation Application
 
-Valores listos para copiar-pegar en https://signpath.org/foundation
+Ready-to-paste values for the form at https://signpath.org/foundation
 
-## Campos del formulario
+## Form fields
 
 ### Project Name *
 ```
@@ -23,7 +23,7 @@ https://github.com/Debaq/audiopac
 ```
 https://github.com/Debaq/audiopac/releases
 ```
-(El README ya menciona: "Los binarios Windows están firmados con certificado de código proporcionado por SignPath Foundation")
+*(The README already states: "Windows binaries are signed with a code signing certificate provided by SignPath Foundation as part of their free sponsorship program for open source projects.")*
 
 ### Privacy Policy URL
 ```
@@ -31,37 +31,38 @@ https://github.com/Debaq/audiopac/blob/main/PRIVACY.md
 ```
 
 ### Wikipedia URL
-*(dejar vacío)*
+*(leave empty)*
 
 ### Tagline *
 ```
-Software clínico open-source para evaluación del Procesamiento Auditivo Central (DPS/PPS)
+Open-source clinical software for Central Auditory Processing evaluation (DPS/PPS tests)
 ```
 
 ### Description *
 ```
-AudioPAC es software open-source multiplataforma para la evaluación del Procesamiento Auditivo Central en entornos clínicos y de investigación. Implementa los tests estándar Duration Pattern Sequence (DPS) y Pitch Pattern Sequence (PPS) usados por audiólogos y fonoaudiólogos para diagnóstico de trastornos del procesamiento auditivo central. Permite parámetros totalmente configurables para investigación, gestión de pacientes, generación de informes clínicos en PDF y exportación de datos para análisis estadístico. Funciona 100% offline con base de datos local SQLite, sin telemetría ni envío de datos a servidores.
+AudioPAC is open-source cross-platform software for the clinical evaluation of Central Auditory Processing Disorders (CAPD). It implements the standard Duration Pattern Sequence (DPS) and Pitch Pattern Sequence (PPS) tests used by audiologists and speech-language pathologists for diagnosing auditory processing disorders. The software provides fully configurable test parameters for research use, patient management, clinical PDF report generation, and CSV data export for statistical analysis. It runs 100% offline with a local SQLite database, with no telemetry or remote data transmission.
 ```
 
 ### Reputation *
 ```
-AudioPAC es un proyecto clínico activo en desarrollo inicial, construido para llenar un vacío real en el ecosistema de software audiológico open-source en español. Los tests DPS y PPS son procedimientos estándar enseñados en programas universitarios de fonoaudiología y audiología en Latinoamérica, pero los softwares comerciales existentes son costosos ($500-2000 USD por licencia) y cerrados, lo que limita su uso en universidades públicas, centros de salud de bajos recursos y proyectos de investigación.
+AudioPAC is an early-stage clinical project built to fill a real gap in the Spanish-speaking open-source audiology software ecosystem. The DPS and PPS tests are standard procedures taught in university audiology and speech-language pathology programs throughout Latin America, but existing commercial software is expensive (USD $500-2000 per license) and closed-source, limiting adoption in public universities, low-resource healthcare centers, and research projects.
 
-El proyecto se desarrolla con estándares profesionales: CI/CD completo en GitHub Actions, TypeScript strict, arquitectura modular Tauri+React, base de datos SQLite con migraciones versionadas, y documentación técnica extensa. El código fuente y la documentación están disponibles públicamente bajo licencia MIT.
+The project is developed with professional standards: full CI/CD on GitHub Actions, strict TypeScript, modular Tauri + React architecture, versioned SQLite migrations, and extensive technical documentation. Source code and documentation are publicly available under the MIT license.
 
-Target inicial: profesionales clínicos, estudiantes de fonoaudiología e investigadores en Chile y Latinoamérica. La obtención de firma de código es crítica para adopción en entornos hospitalarios e institucionales donde las políticas de IT bloquean ejecutables sin firmar.
+Initial target audience: clinical professionals, audiology/speech-language pathology students, and researchers in Chile and Latin America. Obtaining a code signing certificate is critical for adoption in hospital and institutional environments where IT policies block unsigned executables.
 
-Enlaces:
-- Repositorio: https://github.com/Debaq/audiopac
+Links:
+- Repository: https://github.com/Debaq/audiopac
 - Releases: https://github.com/Debaq/audiopac/releases
-- Documentación técnica: https://github.com/Debaq/audiopac/tree/main/docs
+- Technical documentation: https://github.com/Debaq/audiopac/tree/main/docs
+- Privacy policy: https://github.com/Debaq/audiopac/blob/main/PRIVACY.md
 ```
 
 ### Maintainer Type
 ```
 Individual
 ```
-*(o "Informal group" si colaboras con otros)*
+*(or "Informal group" if you collaborate with others)*
 
 ### Build System
 ```
@@ -69,59 +70,56 @@ GitHub Actions
 ```
 
 ### First Name *
-**[TU NOMBRE]**
+**[YOUR FIRST NAME]**
 
 ### Last Name *
-**[TU APELLIDO]**
+**[YOUR LAST NAME]**
 
 ### Email *
-**[TU EMAIL]**
+**[YOUR EMAIL]**
 
 ### Company Name
-*(opcional - dejar vacío si no aplica, o nombre de tu universidad/institución)*
+*(optional - leave empty or put your university/institution name)*
 
 ### Primary Discovery Channel *
-Opciones típicas: "Search engine", "GitHub", "Recommendation", "Blog/article"
+Typical options: "Search engine", "GitHub", "Recommendation", "Blog/article"
 
 ### Please specify the exact source
-```
-Recomendación de otro proyecto open source que usa SignPath Foundation
-```
-*(o lo que corresponda a la realidad)*
+*(e.g. "Google search for code signing open source", "Recommended by another OSS project", "GitHub repository of a similar tool", etc.)*
 
 ### Checkboxes
-- ☑ **Code of Conduct** — marcar (obligatorio)
-- ☐ I agree to receive other communications — opcional, tu decisión
-- ☑ **Store and process personal data** — marcar (obligatorio)
+- ☑ **Code of Conduct** — required
+- ☐ I agree to receive other communications — optional
+- ☑ **Store and process personal data** — required
 
-## Info necesaria de ti
+## Info needed from you
 
-Para completar el formulario necesito:
+To generate the final text I need:
 
-1. **First Name** y **Last Name** reales
-2. **Email** para la cuenta SignPath
-3. **Company Name** (opcional — universidad, centro clínico, o dejar vacío)
-4. **Primary Discovery Channel** y fuente específica
+1. **First Name** and **Last Name** (real)
+2. **Email** for the SignPath account
+3. **Company Name** (optional — university, clinical center, or empty)
+4. **Primary Discovery Channel** and the specific source
 
-Si me das esos 4 datos, genero el texto final listo para copy-paste.
+Share those 4 items and I'll give you the final ready-to-paste text.
 
-## Tras aprobación
+## After approval
 
-SignPath te creará:
+SignPath will set up for you:
 - Organization ID
-- Project en signpath.io (slug: `audiopac`)
-- Signing policy (usualmente `release-signing`)
+- Project at signpath.io (slug: `audiopac`)
+- Signing policy (usually `release-signing`)
 
-Luego configuras en GitHub → Settings → Secrets:
+Then configure GitHub → Settings → Secrets:
 - `SIGNPATH_ORGANIZATION_ID`
 - `SIGNPATH_PROJECT_SLUG` = `audiopac`
 - `SIGNPATH_SIGNING_POLICY_SLUG` = `release-signing`
-- `SIGNPATH_API_TOKEN` (si no usan OIDC trust relationship)
+- `SIGNPATH_API_TOKEN` (unless they set up OIDC trust relationship)
 
-Y activas el workflow:
+And activate the workflow:
 ```bash
 mv .github/workflows/release.yml .github/workflows/release-unsigned.yml.disabled
 mv .github/workflows/release-signpath.yml.disabled .github/workflows/release.yml
-git commit -am "chore: activar firma SignPath Foundation"
+git commit -am "chore: enable SignPath Foundation signing"
 git push
 ```
