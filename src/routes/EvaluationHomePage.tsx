@@ -8,6 +8,8 @@ import { Select } from '@/components/ui/select'
 import { listPatients } from '@/lib/db/patients'
 import { listTemplates } from '@/lib/db/templates'
 import { createSession, listInProgressSessions, cancelSession } from '@/lib/db/sessions'
+import { getActiveCalibration, getActiveCurve } from '@/lib/db/calibrations'
+import { PreSessionCheck } from '@/components/PreSessionCheck'
 import { useAuth } from '@/stores/auth'
 import type { Patient, TestTemplateParsed, Ear, ResponseMode, SessionWithDetails } from '@/types'
 import { formatDateTime } from '@/lib/utils'
@@ -25,6 +27,7 @@ export function EvaluationHomePage() {
   const [ear, setEar] = useState<Ear>('binaural')
   const [responseMode, setResponseMode] = useState<ResponseMode>('manual')
   const [starting, setStarting] = useState(false)
+  const [showCheck, setShowCheck] = useState(false)
 
   useEffect(() => {
     Promise.all([listPatients(), listTemplates(true), listInProgressSessions()]).then(([p, t, ip]) => {
@@ -47,11 +50,21 @@ export function EvaluationHomePage() {
     [templates, templateId]
   )
 
+  const requestStart = () => {
+    if (!patientId || !templateId || !profile) return
+    setShowCheck(true)
+  }
+
   const start = async () => {
     if (!patientId || !templateId || !profile) return
+    setShowCheck(false)
     setStarting(true)
     try {
       const tmpl = templates.find(t => t.id === templateId)!
+      const [cal, curve] = await Promise.all([getActiveCalibration(), getActiveCurve()])
+      const curveSnap = curve.length > 0
+        ? JSON.stringify(curve.map(p => ({ frequency_hz: p.frequency_hz, ear: p.ear, ref_db_spl: p.ref_db_spl })))
+        : null
       const sid = await createSession({
         patient_id: Number(patientId),
         template_id: Number(templateId),
@@ -59,6 +72,9 @@ export function EvaluationHomePage() {
         ear,
         response_mode: responseMode,
         config_snapshot: JSON.stringify(tmpl.config),
+        calibration_id: cal?.id ?? null,
+        ref_db_snapshot: cal?.ref_db_spl ?? null,
+        calibration_curve_snapshot: curveSnap,
       })
       navigate(`/evaluacion/${sid}`)
     } finally {
@@ -170,9 +186,13 @@ export function EvaluationHomePage() {
         </Card>
       )}
 
-      <Button size="lg" className="w-full" disabled={!patientId || !templateId || starting} onClick={start}>
+      <Button size="lg" className="w-full" disabled={!patientId || !templateId || starting} onClick={requestStart}>
         <Activity className="w-5 h-5" /> {starting ? 'Iniciando...' : 'Iniciar evaluación'}
       </Button>
+
+      {showCheck && (
+        <PreSessionCheck onProceed={start} onCancel={() => setShowCheck(false)} />
+      )}
     </div>
   )
 }

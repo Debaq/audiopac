@@ -23,6 +23,65 @@ pub fn run() {
     }
 
     builder
+        .setup(|app| {
+            use tauri::Manager;
+
+            #[cfg(target_os = "linux")]
+            {
+                use webkit2gtk::{PermissionRequestExt, SettingsExt, WebViewExt};
+
+                for (_, window) in app.webview_windows() {
+                    let _ = window.with_webview(|webview| {
+                        let wv = webview.inner();
+                        if let Some(settings) = WebViewExt::settings(&wv) {
+                            settings.set_enable_media_stream(true);
+                            settings.set_enable_mediasource(true);
+                            settings.set_media_playback_requires_user_gesture(false);
+                        }
+                        wv.connect_permission_request(|_, request| {
+                            request.allow();
+                            true
+                        });
+                    });
+                }
+            }
+
+            #[cfg(target_os = "windows")]
+            {
+                use webview2_com::{
+                    Microsoft::Web::WebView2::Win32::{
+                        COREWEBVIEW2_PERMISSION_STATE_ALLOW, ICoreWebView2_13,
+                        ICoreWebView2PermissionRequestedEventHandler,
+                    },
+                    PermissionRequestedEventHandler,
+                };
+                use windows::core::Interface;
+
+                for (_, window) in app.webview_windows() {
+                    let _ = window.with_webview(|webview| {
+                        unsafe {
+                            let core = webview.controller().CoreWebView2().ok();
+                            if let Some(core) = core {
+                                let mut token = Default::default();
+                                let handler = PermissionRequestedEventHandler::create(Box::new(
+                                    |_sender, args| {
+                                        if let Some(args) = args {
+                                            let _ = args.SetState(COREWEBVIEW2_PERMISSION_STATE_ALLOW);
+                                        }
+                                        Ok(())
+                                    },
+                                ));
+                                let _ = core.add_PermissionRequested(&handler, &mut token);
+                                // Intenta ICoreWebView2_13 (no todas las versiones lo tienen).
+                                let _ = core.cast::<ICoreWebView2_13>();
+                            }
+                        }
+                    });
+                }
+            }
+
+            Ok(())
+        })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

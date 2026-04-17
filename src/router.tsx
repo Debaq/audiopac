@@ -11,6 +11,8 @@ import { TestsPage } from '@/routes/TestsPage'
 import { TestEditorPage } from '@/routes/TestEditorPage'
 import { ReportsPage } from '@/routes/ReportsPage'
 import { SessionReportPage } from '@/routes/SessionReportPage'
+import { CalibrationPage } from '@/routes/CalibrationPage'
+import { StimuliPage } from '@/routes/StimuliPage'
 
 export const router = createBrowserRouter([
   { path: '/', element: <ProfileSelectorPage /> },
@@ -30,6 +32,8 @@ export const router = createBrowserRouter([
           { path: '/tests/:id', element: <TestEditorPage /> },
           { path: '/informes', element: <ReportsPage /> },
           { path: '/informes/:sessionId', element: <SessionReportPage /> },
+          { path: '/calibracion', element: <CalibrationPage /> },
+          { path: '/estimulos', element: <StimuliPage /> },
         ],
       },
     ],

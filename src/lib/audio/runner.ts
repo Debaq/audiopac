@@ -1,5 +1,5 @@
 import type { TestConfig, Ear, Phase } from '@/types'
-import { playSequence } from './engine'
+import { playSequence, type CalibCurvePoint } from './engine'
 
 export interface RunnerItem {
   index: number
@@ -22,12 +22,22 @@ export interface RunnerState {
 export class TestRunner {
   private config: TestConfig
   private ear: Ear
+  private refDb: number | undefined
+  private curve: CalibCurvePoint[] | undefined
   state: RunnerState
   private listeners = new Set<(s: RunnerState) => void>()
 
-  constructor(config: TestConfig, ear: Ear = 'binaural', startPhase: Phase = 'practice') {
+  constructor(
+    config: TestConfig,
+    ear: Ear = 'binaural',
+    startPhase: Phase = 'practice',
+    refDb?: number,
+    curve?: CalibCurvePoint[]
+  ) {
     this.config = config
     this.ear = ear
+    this.refDb = refDb
+    this.curve = curve
     const practice = config.practice_sequences.map<RunnerItem>((p, i) => ({ index: i, phase: 'practice', pattern: p }))
     const test = config.test_sequences.map<RunnerItem>((p, i) => ({ index: i, phase: 'test', pattern: p }))
     const items = startPhase === 'practice' ? practice.concat(test) : test
@@ -53,7 +63,7 @@ export class TestRunner {
     this.state.isPlaying = true
     this.emit()
     item.presentedAt = Date.now()
-    await playSequence(item.pattern, this.config, { ear: this.ear })
+    await playSequence(item.pattern, this.config, { ear: this.ear, refDb: this.refDb, curve: this.curve })
     this.state.isPlaying = false
     this.emit()
   }

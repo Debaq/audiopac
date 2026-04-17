@@ -9,7 +9,7 @@ import { getSession, finishSession, cancelSession, saveResponse, listResponses }
 import { getTemplate } from '@/lib/db/templates'
 import { getPatient } from '@/lib/db/patients'
 import { TestRunner, type RunnerState } from '@/lib/audio/runner'
-import { ensureRunning } from '@/lib/audio/engine'
+import { ensureRunning, type CalibCurvePoint } from '@/lib/audio/engine'
 import { useKeyboard, Kbd } from '@/hooks/useKeyboard'
 import type { TestSession, TestTemplateParsed, Patient } from '@/types'
 import { percent, cn } from '@/lib/utils'
@@ -42,7 +42,11 @@ export function EvaluationRunPage() {
       setTemplate(t)
       setPatient(p)
       if (t) {
-        const r = new TestRunner(t.config, s.ear, 'practice')
+        let curve: CalibCurvePoint[] | undefined
+        if (s.calibration_curve_snapshot) {
+          try { curve = JSON.parse(s.calibration_curve_snapshot) } catch { curve = undefined }
+        }
+        const r = new TestRunner(t.config, s.ear, 'practice', s.ref_db_snapshot ?? undefined, curve)
         runnerRef.current = r
         const prev = await listResponses(sid)
         if (prev.length > 0) r.hydrate(prev)

@@ -14,33 +14,33 @@ Documento vivo. Agrupa: pruebas PAC factibles, módulo de grabación de estímul
 - Patrones como strings (secuencias discretas de tokens)
 - Sin ruido, sin habla, sin filtros, sin presentación simultánea L≠R
 
-### 1.1 Factibles ya, sin tocar motor (solo plantilla `CUSTOM`)
+### 1.1 Factibles ya, sin tocar motor (solo plantilla `CUSTOM`) ✅ hecho (migración 004)
 
-| Prueba | Descripción | Notas |
-|---|---|---|
-| **FPT** (Frequency Pattern Test / Pinheiro) | Variante PPS con 3 tonos, 880/1122 Hz, 150 ms | Cabe en esquema actual |
-| **DPT** | Duration Pattern Test | Ya soportado como DPS |
-| **DLF** | Diferencia Limen de Frecuencia — 2 tonos "¿iguales o diferentes?" | Patrón 2 tokens, uno con variación de freq |
-| **DLD** | Diferencia Limen de Duración — 2 tonos misma freq, dur distinta | Idem |
-| **Resolución temporal por gap** | 2 tonos con ISI variable (5–50 ms) | ISI ya ajustable |
-| **Discriminación patrón tonal largo** | PPS extendido 5–7 tonos para adultos con sospecha leve | |
-| **Memoria auditiva secuencial** | Patrones de longitud creciente (2→7), retención | |
+| Prueba | Descripción | Notas | Estado |
+|---|---|---|---|
+| **FPT** (Frequency Pattern Test / Pinheiro) | Variante PPS con 3 tonos, 880/1122 Hz, 150 ms | Cabe en esquema actual | ✅ `FPT_STD` |
+| **DPT** | Duration Pattern Test | Ya soportado como DPS | ✅ `DPT_LONG` |
+| **DLF** | Diferencia Limen de Frecuencia — 2 tonos "¿iguales o diferentes?" | Patrón 2 tokens, uno con variación de freq | ✅ `DLF_SCREEN`/`DLF_FINE` |
+| **DLD** | Diferencia Limen de Duración — 2 tonos misma freq, dur distinta | Idem | ✅ `DLD_SCREEN`/`DLD_FINE` |
+| **Resolución temporal por gap** | 2 tonos con ISI variable (5–50 ms) | ISI ya ajustable | ✅ `GAP_20`/`GAP_10`/`GAP_5` (mig 005) |
+| **Discriminación patrón tonal largo** | PPS extendido 5–7 tonos para adultos con sospecha leve | | ✅ `PPS_LONG` |
+| **Memoria auditiva secuencial** | Patrones de longitud creciente (2→7), retención | | ✅ `MEM_SEQ_5/6/7` |
 
-### 1.2 Requieren extensión chica del motor
+### 1.2 Requieren extensión chica del motor ✅ hecho (migración 005)
 
-Agregar campos al `ToneSpec` / `TestConfig`:
+Agregado a `ToneDefinition`:
 
-- `level_db` por tono → habilita **DLI** (Diferencia Limen de Intensidad)
-- `ear` por tono en el patrón → habilita **TOJ** (Orden Temporal Binaural: tono L, tono R con ISI corto)
-- `gain_l` / `gain_r` por tono → habilita **Lateralización por ILD**
+- ✅ `level_db` por tono → **DLI** (`DLI_SCREEN`/`DLI_FINE`)
+- ✅ `ear` por tono en el patrón → **TOJ** (`TOJ_BIN`/`TOJ_FAST`)
+- ✅ `gain_l` / `gain_r` por tono → **Lateralización por ILD** (`ILD_LAT`)
 
-### 1.3 Requieren extensión media (presentación simultánea L≠R)
+### 1.3 Requieren extensión media (presentación simultánea L≠R) ✅ hecho (migración 006)
 
-`simultaneousChannels` en `TestConfig`: generar dos `SequencePlan` paralelos, conectar cada uno a su canal por separado.
+Se implementó vía patrón con separador `|`: `"LHL|HLH"` → parte izquierda al oído L, derecha al R, simultáneas. `buildSequencePlan` produce planes paralelos fusionados.
 
-- **Escucha dicótica no verbal** (secuencia A a oído L + B a R simultáneas)
-- **Fusión binaural tonal** (tono dividido: mitades temporales a oídos opuestos)
-- **Detección de gap con cambio de frecuencia**
+- ✅ **Escucha dicótica no verbal** (`DICHOTIC_NV`)
+- ✅ **Fusión binaural tonal** (`FUSION_BIN`)
+- ✅ Detección de gap con cambio de frecuencia (`FGC_SCREEN`, mig 009). Micro-splice con ISI=0 + envolvente 2 ms. Patrones FFF (igual) / FGF (+200 Hz) / FHF (+500 Hz)
 
 ### 1.4 No factibles sin infraestructura nueva (requieren Fase 1+)
 
@@ -114,21 +114,40 @@ Objetivo: que los dB reportados sean dB SPL reales, no pseudo-calibrados.
 
 ## 4. Plan por fases
 
-### Fase 1 — Grabación + logoaudiometría básica
-- Schema `stimuli`
-- UI grabador (record, preview, re-record)
-- Normalizador RMS + trim silencios + fade
-- Plantilla logoaudiometría simple (SRT con lista fija)
+### Fase 1 — Grabación + logoaudiometría básica ✅ parcial (migración 012)
+- ✅ Schema `stimulus_lists` + `stimuli` (tokens con audio opcional, file_path, métricas RMS/peak/duración/sample_rate, normalized flag)
+- ✅ Setting global `country_code` (LATAM, US, + 19 países) con filtrado de listas por país en UI
+- ✅ Listas seed LatAm neutras (SRT bisílabos, Discriminación monosílabos, Dichotic Digits ES) + SRT US-ES
+- ✅ UI `/estimulos`: selector país, gestión listas custom, grabador por token (record/detener/cancelar/regrabar/preview/reanalizar/borrar), contador progreso
+- ✅ Captura: `MediaRecorder` WebM/Opus sin EC/NS/AGC, decode a `AudioBuffer`
+- ✅ Procesado automático: resample mono 44.1 kHz, HP 80 Hz (`OfflineAudioContext` + biquad), trim por RMS ventana 20 ms (umbral −45 dBFS), fade 10 ms, normalización RMS a −20 dBFS con clamp anti-clip 0.99
+- ✅ Export a WAV PCM 16-bit mono. Almacenamiento en `appDataDir/stimuli/list{id}_{pos}_{token}.wav` vía `@tauri-apps/plugin-fs`
+- ✅ Motor: `playStimulusBuffer(buffer, level_db, {rms_dbfs, ear})` mapea SPL usando curva activa a 1 kHz. Cache de buffers decodificados
+- ⚠️ Pendiente: plantilla logoaudiometría simple (SRT runner). Requiere flow adaptativo de nivel + scoring por palabra (siguiente paso)
+- ⚠️ Pendiente: denoise espectral (queda para Fase 4)
 
-### Fase 2 — Calibración global
-- Schema `calibrations`
-- UI calibración 1 kHz con offset global
-- Lock de volumen OS (advertencia + detección de cambio)
+### Fase 2 — Calibración global ✅ hecho (migraciones 006 + 010)
+- ✅ Schema `calibrations` + `calibration_id`/`ref_db_snapshot` en `test_sessions`
+- ✅ UI `/calibracion` con tono continuo 1 kHz @ -20 dBFS, captura dB SPL medido, cálculo de `ref_db_spl`
+- ✅ `dbToGain()` consume `ref_db` activo (reemplaza 85 hardcoded)
+- ✅ Snapshot de calibración al iniciar sesión (reproducible e inmutable por informe)
+- ✅ Advertencias clínicas en UI (uso investigativo, lock de volumen, no ANSI S3.6)
+- ✅ Captura `device_id`/`device_label` en calibración (mig 010) vía `enumerateDevices`
+- ✅ Listener `devicechange` global (store `useCalibrationStore`) → invalida calibración si cambia default output
+- ✅ Expiración de calibración: `valid_until` default +6 meses, badge "Vencida" en lista
+- ✅ Banner calibración en `AppLayout`: estado `ok`/`expired`/`device_mismatch`/`none`, link a `/calibracion`
+- ✅ Modal `PreSessionCheck` pre-sesión: reproduce 2 tonos (ref y −6 dB en orden aleatorio), user elige el más fuerte. Detecta cambios groseros de volumen SO / mute / auriculares.
+- ⚠️ Limitación: sin plugin nativo no se puede leer volumen OS directo. Tono de verificación cubre el hueco.
 
-### Fase 3 — Calibración avanzada
-- Calibración multi-frecuencia (250/500/1k/2k/4k/8k)
-- Separada por oído
-- Versionado de calibración en sesiones
+### Fase 3 — Calibración avanzada ✅ hecho (migración 011)
+- ✅ Tabla `calibration_points` (freq × oído × ref_db_spl) con FK a `calibrations` + CASCADE
+- ✅ Backfill: filas existentes convertidas a punto único
+- ✅ `resolveRefDb(freq, ear, curve?)` interpola log-frecuencia entre puntos del mismo oído; fallback binaural → otro oído → escalar
+- ✅ `dbToGain(db_spl, ref_db?, freq?, ear?)` consume la curva activa o scalar override
+- ✅ `playSequence`/`playTonePreview` toman la curva en `options.curve` + `TestRunner` la pasa desde `calibration_curve_snapshot`
+- ✅ Snapshot curva por sesión (`test_sessions.calibration_curve_snapshot` JSON) — reproducible e inmutable
+- ✅ Store global (`useCalibrationStore`) carga `setActiveCalibrationCurve` en boot y al activar otra calibración
+- ✅ UI `/calibracion`: crear set → agregar puntos por chip de freq + oído, matriz 6 × 2 con contador N/12
 
 ### Fase 4 — Procesamiento avanzado + pruebas PAC verbales
 - Denoise espectral
@@ -136,21 +155,23 @@ Objetivo: que los dB reportados sean dB SPL reales, no pseudo-calibrados.
 - Biblioteca de listas estándar (PAL, PALPA, HINT-ES)
 - Dichotic Digits ES, SSW adaptado, SinB-ES
 
-### Fase 5 — Ruido (bonus)
-- Generador de ruido banda ancha / angosta
-- Mezcla ruido + tono
-- Habilita GIN, Random Gap Detection, MLD
+### Fase 5 — Ruido (bonus) ✅ parcial (migración 007)
+- ✅ Generador de ruido blanco (buffer random en loop)
+- ✅ Generador de ruido rosa (filtro Paul Kellet)
+- ✅ Ruido de banda angosta (bandpass `BiquadFilterNode` con `Q = center/bandwidth`)
+- ✅ Gap embebido en ruido continuo (carve vía envolvente, ramp 2 ms)
+- ✅ Plantillas nuevas: `GIN_STD` (gaps 2–20 ms en 3 s de ruido), `RGD_20/10/5` (Random Gap Detection con bursts de ruido), `NBN_SCREEN` (ruido banda angosta 1 kHz)
+- ✅ Mezcla simultánea tono + ruido vía `ToneDefinition.noise_mix` (rama paralela en `playSequence`, misma envolvente de duración)
+- ✅ **MLD (Masking Level Difference)** (`MLD_STD`, mig 008). Inversión de fase R vía `phase_invert_right` (gain -1 en `rightNode` del tono; ruido nunca invertido). Tokens A=SoNo+tono, B=SoNo catch, C=SπNo+tono (−10 dB), D=SπNo catch
+- ⚠️ Calibración SPL: `ref_db` actual fue medido con tono puro. El ruido blanco/rosa a la misma amplitud digital da ~3–5 dB SPL más que un tono puro. Para clínica estricta, calibrar ruido por separado.
 
 ---
 
-## 5. Extensiones menores pendientes al motor (independientes)
+## 5. Extensiones menores pendientes al motor (independientes) ✅ cerrado
 
-Agregar al `ToneSpec`:
-- `level_db` (nivel por tono)
-- `ear` ('left' | 'right' | 'binaural') por tono
-- `gain_l` / `gain_r` (lateralización fina)
+- ✅ `level_db` por tono
+- ✅ `ear` por tono
+- ✅ `gain_l` / `gain_r` por tono
+- ✅ Dichotic vía sintaxis `"L|R"` en patrón (en lugar de `simultaneousChannels` bool)
 
-Agregar al `TestConfig`:
-- `simultaneousChannels`: permite patrones paralelos L/R distintos
-
-Habilita ~6 pruebas PAC sin infraestructura nueva.
+Habilitó 9 plantillas PAC nuevas (mig 005 + 006).

@@ -1,9 +1,21 @@
-import type { TestConfig, Ear } from '@/types'
+import type { TestConfig, Ear, NoiseType, NoiseMix } from '@/types'
 
 export interface TonePlan {
   frequency: number
   duration_ms: number
   startOffset_ms: number
+  level_db?: number
+  ear?: Ear
+  gain_l?: number
+  gain_r?: number
+  kind?: 'tone' | 'noise'
+  noise_type?: NoiseType
+  center_hz?: number
+  bandwidth_hz?: number
+  gap_at_ms?: number
+  gap_width_ms?: number
+  noise_mix?: NoiseMix
+  phase_invert_right?: boolean
 }
 
 export interface SequencePlan {
@@ -33,79 +45,302 @@ export async function closeAudioContext() {
   }
 }
 
+export const DEFAULT_REF_DB = 85
+let activeRefDb = DEFAULT_REF_DB
+
+export interface CalibCurvePoint {
+  frequency_hz: number
+  ear: Ear
+  ref_db_spl: number
+}
+
+let activeCurve: CalibCurvePoint[] = []
+
+export function setActiveRefDb(ref_db: number) {
+  activeRefDb = ref_db
+}
+
+export function getActiveRefDb(): number {
+  return activeRefDb
+}
+
+export function setActiveCalibrationCurve(points: CalibCurvePoint[]) {
+  activeCurve = points.slice()
+}
+
+export function getActiveCalibrationCurve(): CalibCurvePoint[] {
+  return activeCurve.slice()
+}
+
 /**
- * dB SPL aproximado a gain lineal. Referencia 0 dBFS = ~85 dB SPL típico en headphones.
- * Para calibración clínica real se debe ajustar con sonómetro.
+ * Resuelve ref_db para (freq, ear) interpolando log-freq.
+ * Prioridad: puntos del mismo oído → puntos binaurales → activeRefDb escalar.
  */
-export function dbToGain(db_spl: number, ref_db = 85): number {
-  const db_fs = db_spl - ref_db
+export function resolveRefDb(frequency_hz: number, ear: Ear = 'binaural', curve?: CalibCurvePoint[]): number {
+  const points = curve ?? activeCurve
+  if (points.length === 0) return activeRefDb
+  const byEar = (e: Ear) => points.filter(p => p.ear === e).sort((a, b) => a.frequency_hz - b.frequency_hz)
+  let cand = byEar(ear)
+  if (cand.length === 0) cand = byEar('binaural')
+  if (cand.length === 0) cand = byEar(ear === 'left' ? 'right' : 'left')
+  if (cand.length === 0) return activeRefDb
+  if (cand.length === 1) return cand[0].ref_db_spl
+  if (frequency_hz <= cand[0].frequency_hz) return cand[0].ref_db_spl
+  if (frequency_hz >= cand[cand.length - 1].frequency_hz) return cand[cand.length - 1].ref_db_spl
+  for (let i = 0; i < cand.length - 1; i++) {
+    const a = cand[i], b = cand[i + 1]
+    if (frequency_hz >= a.frequency_hz && frequency_hz <= b.frequency_hz) {
+      const la = Math.log2(a.frequency_hz)
+      const lb = Math.log2(b.frequency_hz)
+      const lf = Math.log2(frequency_hz)
+      const t = (lf - la) / (lb - la)
+      return a.ref_db_spl + t * (b.ref_db_spl - a.ref_db_spl)
+    }
+  }
+  return activeRefDb
+}
+
+/**
+ * dB SPL aproximado a gain lineal. Referencia: ref_db = dB SPL medidos a 0 dBFS.
+ * Con `freq`+`ear`, resuelve por curva multi-freq. Sin args, usa `activeRefDb` escalar.
+ */
+export function dbToGain(db_spl: number, ref_db?: number, freq?: number, ear?: Ear): number {
+  let ref: number
+  if (ref_db !== undefined) ref = ref_db
+  else if (freq !== undefined) ref = resolveRefDb(freq, ear)
+  else ref = activeRefDb
+  const db_fs = db_spl - ref
   return Math.pow(10, db_fs / 20)
 }
 
-export function buildSequencePlan(pattern: string, config: TestConfig): SequencePlan {
+function buildSidePlan(
+  chars: string,
+  config: TestConfig,
+  earOverride?: Ear
+): { tones: TonePlan[]; total: number } {
   const tones: TonePlan[] = []
   let offset = 0
-  for (const ch of pattern) {
+  for (const ch of chars) {
     const tone = config.tones[ch]
     if (!tone) throw new Error(`Tono no definido: ${ch}`)
     const duration = tone.duration_ms ?? config.duration_ms ?? 200
     const frequency = tone.frequency ?? config.frequency ?? 1000
-    tones.push({ frequency, duration_ms: duration, startOffset_ms: offset })
+    tones.push({
+      frequency,
+      duration_ms: duration,
+      startOffset_ms: offset,
+      level_db: tone.level_db,
+      ear: earOverride ?? tone.ear,
+      gain_l: earOverride ? undefined : tone.gain_l,
+      gain_r: earOverride ? undefined : tone.gain_r,
+      kind: tone.kind,
+      noise_type: tone.noise_type,
+      center_hz: tone.center_hz,
+      bandwidth_hz: tone.bandwidth_hz,
+      gap_at_ms: tone.gap_at_ms,
+      gap_width_ms: tone.gap_width_ms,
+      noise_mix: tone.noise_mix,
+      phase_invert_right: tone.phase_invert_right,
+    })
     offset += duration + config.isi_ms
   }
   const total = offset - config.isi_ms
+  return { tones, total }
+}
+
+/**
+ * Genera plan de reproducción. Patrón con `|` = dichotic:
+ *   "LHL|HLH" → parte izq "LHL" al oído L, parte der "HLH" al oído R, simultáneas.
+ *   Cada parte avanza con su propio ISI desde t=0; totalDuration = max de ambas.
+ */
+export function buildSequencePlan(pattern: string, config: TestConfig): SequencePlan {
+  if (pattern.includes('|')) {
+    const parts = pattern.split('|')
+    if (parts.length !== 2) throw new Error('Patrón dichotic debe tener exactamente un "|"')
+    const left = buildSidePlan(parts[0], config, 'left')
+    const right = buildSidePlan(parts[1], config, 'right')
+    return {
+      tones: [...left.tones, ...right.tones],
+      totalDuration_ms: Math.max(left.total, right.total),
+    }
+  }
+  const { tones, total } = buildSidePlan(pattern, config)
   return { tones, totalDuration_ms: total }
 }
 
-function channelRouting(ctx: AudioContext, ear: Ear) {
-  const merger = ctx.createChannelMerger(2)
-  const leftGain = ctx.createGain()
-  const rightGain = ctx.createGain()
-  leftGain.gain.value = ear === 'right' ? 0 : 1
-  rightGain.gain.value = ear === 'left' ? 0 : 1
-  leftGain.connect(merger, 0, 0)
-  rightGain.connect(merger, 0, 1)
-  return { merger, leftGain, rightGain }
+let whiteNoiseBuffer: AudioBuffer | null = null
+let pinkNoiseBuffer: AudioBuffer | null = null
+
+function getWhiteNoiseBuffer(ctx: AudioContext): AudioBuffer {
+  if (whiteNoiseBuffer && whiteNoiseBuffer.sampleRate === ctx.sampleRate) return whiteNoiseBuffer
+  const duration = 4
+  const buf = ctx.createBuffer(1, ctx.sampleRate * duration, ctx.sampleRate)
+  const data = buf.getChannelData(0)
+  for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1
+  whiteNoiseBuffer = buf
+  return buf
+}
+
+function getPinkNoiseBuffer(ctx: AudioContext): AudioBuffer {
+  if (pinkNoiseBuffer && pinkNoiseBuffer.sampleRate === ctx.sampleRate) return pinkNoiseBuffer
+  const duration = 4
+  const buf = ctx.createBuffer(1, ctx.sampleRate * duration, ctx.sampleRate)
+  const data = buf.getChannelData(0)
+  let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0
+  for (let i = 0; i < data.length; i++) {
+    const w = Math.random() * 2 - 1
+    b0 = 0.99886 * b0 + w * 0.0555179
+    b1 = 0.99332 * b1 + w * 0.0750759
+    b2 = 0.96900 * b2 + w * 0.1538520
+    b3 = 0.86650 * b3 + w * 0.3104856
+    b4 = 0.55000 * b4 + w * 0.5329522
+    b5 = -0.7616 * b5 - w * 0.0168980
+    data[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + w * 0.5362) * 0.11
+    b6 = w * 0.115926
+  }
+  pinkNoiseBuffer = buf
+  return buf
+}
+
+function earGains(ear: Ear): { l: number; r: number } {
+  if (ear === 'left') return { l: 1, r: 0 }
+  if (ear === 'right') return { l: 0, r: 1 }
+  return { l: 1, r: 1 }
 }
 
 export async function playSequence(
   pattern: string,
   config: TestConfig,
-  options?: { ear?: Ear; onStart?: () => void; onEnd?: () => void }
+  options?: { ear?: Ear; refDb?: number; curve?: CalibCurvePoint[]; onStart?: () => void; onEnd?: () => void }
 ): Promise<void> {
   const ctx = await ensureRunning()
-  const ear = options?.ear ?? config.channel
+  const sessionEar = options?.ear ?? config.channel
+  const scalarRef = options?.refDb
+  const curve = options?.curve
   const plan = buildSequencePlan(pattern, config)
-  const masterGain = ctx.createGain()
-  masterGain.gain.value = dbToGain(config.level_db ?? 60)
 
-  const { merger, leftGain, rightGain } = channelRouting(ctx, ear)
-  merger.connect(masterGain)
-  masterGain.connect(ctx.destination)
+  const merger = ctx.createChannelMerger(2)
+  merger.connect(ctx.destination)
 
   const envMs = Math.max(1, config.envelope_ms ?? 10)
   const envSec = envMs / 1000
   const startTime = ctx.currentTime + 0.05
 
-  for (const tone of plan.tones) {
-    const osc = ctx.createOscillator()
-    osc.type = 'sine'
-    osc.frequency.value = tone.frequency
+  function makeNoiseHead(
+    nt: NoiseType | undefined,
+    center_hz?: number,
+    bandwidth_hz?: number,
+    fallbackFreq?: number
+  ): { source: AudioScheduledSourceNode; head: AudioNode } {
+    const src = ctx.createBufferSource()
+    src.buffer = nt === 'pink' ? getPinkNoiseBuffer(ctx) : getWhiteNoiseBuffer(ctx)
+    src.loop = true
+    if (nt === 'narrow') {
+      const filt = ctx.createBiquadFilter()
+      filt.type = 'bandpass'
+      const center = center_hz ?? fallbackFreq ?? 1000
+      const bw = bandwidth_hz ?? Math.max(100, center * 0.2)
+      filt.frequency.value = center
+      filt.Q.value = center / bw
+      src.connect(filt)
+      return { source: src, head: filt }
+    }
+    return { source: src, head: src }
+  }
 
-    const toneGain = ctx.createGain()
+  const refFor = (freq: number, ear: Ear): number => {
+    if (curve && curve.length > 0) return resolveRefDb(freq, ear, curve)
+    if (scalarRef !== undefined) return scalarRef
+    return resolveRefDb(freq, ear)
+  }
+
+  for (const tone of plan.tones) {
+    const levelDb = tone.level_db ?? config.level_db ?? 60
+    const effEar: Ear = tone.ear ?? sessionEar
+    const peak = dbToGain(levelDb, refFor(tone.frequency, effEar))
     const t0 = startTime + tone.startOffset_ms / 1000
     const t1 = t0 + tone.duration_ms / 1000
+
+    const toneGain = ctx.createGain()
     toneGain.gain.setValueAtTime(0, t0)
-    toneGain.gain.linearRampToValueAtTime(1, t0 + envSec)
-    toneGain.gain.setValueAtTime(1, t1 - envSec)
+    toneGain.gain.linearRampToValueAtTime(peak, t0 + envSec)
+
+    if (tone.kind === 'noise' && tone.gap_at_ms !== undefined && tone.gap_width_ms && tone.gap_width_ms > 0) {
+      const gapStart = t0 + tone.gap_at_ms / 1000
+      const gapEnd = gapStart + tone.gap_width_ms / 1000
+      const ramp = Math.min(0.002, tone.gap_width_ms / 4000)
+      toneGain.gain.setValueAtTime(peak, Math.max(t0 + envSec, gapStart - ramp))
+      toneGain.gain.linearRampToValueAtTime(0, gapStart)
+      toneGain.gain.setValueAtTime(0, gapEnd)
+      toneGain.gain.linearRampToValueAtTime(peak, gapEnd + ramp)
+    }
+
+    toneGain.gain.setValueAtTime(peak, t1 - envSec)
     toneGain.gain.linearRampToValueAtTime(0, t1)
 
-    osc.connect(toneGain)
-    toneGain.connect(leftGain)
-    toneGain.connect(rightGain)
+    const useFineGain = tone.gain_l !== undefined || tone.gain_r !== undefined
+    let lGain: number
+    let rGain: number
+    if (useFineGain) {
+      lGain = tone.gain_l ?? 0
+      rGain = tone.gain_r ?? 0
+    } else {
+      const eff = tone.ear ?? sessionEar
+      ;({ l: lGain, r: rGain } = earGains(eff))
+    }
 
-    osc.start(t0)
-    osc.stop(t1 + 0.01)
+    const leftNode = ctx.createGain()
+    const rightNode = ctx.createGain()
+    leftNode.gain.value = lGain
+    rightNode.gain.value = rGain * (tone.phase_invert_right ? -1 : 1)
+
+    let source: AudioScheduledSourceNode
+    let head: AudioNode
+    if (tone.kind === 'noise') {
+      const n = makeNoiseHead(tone.noise_type, tone.center_hz, tone.bandwidth_hz, tone.frequency)
+      source = n.source
+      head = n.head
+    } else {
+      const osc = ctx.createOscillator()
+      osc.type = 'sine'
+      osc.frequency.value = tone.frequency
+      source = osc
+      head = osc
+    }
+
+    head.connect(toneGain)
+    toneGain.connect(leftNode)
+    toneGain.connect(rightNode)
+    leftNode.connect(merger, 0, 0)
+    rightNode.connect(merger, 0, 1)
+
+    source.start(t0)
+    source.stop(t1 + 0.01)
+
+    if (tone.noise_mix) {
+      const nm = tone.noise_mix
+      const nPeak = dbToGain(nm.level_db, refFor(tone.frequency, effEar))
+      const nGain = ctx.createGain()
+      nGain.gain.setValueAtTime(0, t0)
+      nGain.gain.linearRampToValueAtTime(nPeak, t0 + envSec)
+      nGain.gain.setValueAtTime(nPeak, t1 - envSec)
+      nGain.gain.linearRampToValueAtTime(0, t1)
+
+      const nNode = makeNoiseHead(nm.noise_type, nm.center_hz, nm.bandwidth_hz, tone.frequency)
+      const nL = ctx.createGain()
+      const nR = ctx.createGain()
+      nL.gain.value = lGain
+      nR.gain.value = rGain
+
+      nNode.head.connect(nGain)
+      nGain.connect(nL)
+      nGain.connect(nR)
+      nL.connect(merger, 0, 0)
+      nR.connect(merger, 0, 1)
+
+      nNode.source.start(t0)
+      nNode.source.stop(t1 + 0.01)
+    }
   }
 
   options?.onStart?.()
@@ -118,10 +353,15 @@ export async function playSequence(
   })
 }
 
-export async function playTonePreview(frequency: number, duration_ms = 400, level_db = 60) {
+export async function playTonePreview(
+  frequency: number,
+  duration_ms = 400,
+  level_db = 60,
+  opts?: { ear?: Ear; gain_l?: number; gain_r?: number; refDb?: number }
+) {
   const ctx = await ensureRunning()
-  const gain = ctx.createGain()
-  gain.gain.value = dbToGain(level_db)
+  const ref = opts?.refDb !== undefined ? opts.refDb : resolveRefDb(frequency, opts?.ear ?? 'binaural')
+  const peak = dbToGain(level_db, ref)
   const env = ctx.createGain()
   const osc = ctx.createOscillator()
   osc.type = 'sine'
@@ -129,12 +369,169 @@ export async function playTonePreview(frequency: number, duration_ms = 400, leve
   const t0 = ctx.currentTime + 0.02
   const t1 = t0 + duration_ms / 1000
   env.gain.setValueAtTime(0, t0)
-  env.gain.linearRampToValueAtTime(1, t0 + 0.01)
-  env.gain.setValueAtTime(1, t1 - 0.01)
+  env.gain.linearRampToValueAtTime(peak, t0 + 0.01)
+  env.gain.setValueAtTime(peak, t1 - 0.01)
   env.gain.linearRampToValueAtTime(0, t1)
+
+  const useFineGain = opts?.gain_l !== undefined || opts?.gain_r !== undefined
+  let lGain: number
+  let rGain: number
+  if (useFineGain) {
+    lGain = opts?.gain_l ?? 0
+    rGain = opts?.gain_r ?? 0
+  } else {
+    ;({ l: lGain, r: rGain } = earGains(opts?.ear ?? 'binaural'))
+  }
+
+  const merger = ctx.createChannelMerger(2)
+  const leftNode = ctx.createGain()
+  const rightNode = ctx.createGain()
+  leftNode.gain.value = lGain
+  rightNode.gain.value = rGain
+
   osc.connect(env)
-  env.connect(gain)
-  gain.connect(ctx.destination)
+  env.connect(leftNode)
+  env.connect(rightNode)
+  leftNode.connect(merger, 0, 0)
+  rightNode.connect(merger, 0, 1)
+  merger.connect(ctx.destination)
+
   osc.start(t0)
   osc.stop(t1 + 0.02)
+}
+
+/**
+ * Burst corto en dBFS directo (sin mapeo SPL). Para verificación pre-sesión.
+ */
+export async function playBurstDbfs(
+  frequency: number,
+  duration_ms: number,
+  dbfs: number,
+  ear: Ear = 'binaural'
+): Promise<void> {
+  const ctx = await ensureRunning()
+  const peak = Math.pow(10, dbfs / 20)
+  const osc = ctx.createOscillator()
+  osc.type = 'sine'
+  osc.frequency.value = frequency
+  const env = ctx.createGain()
+  const t0 = ctx.currentTime + 0.02
+  const t1 = t0 + duration_ms / 1000
+  env.gain.setValueAtTime(0, t0)
+  env.gain.linearRampToValueAtTime(peak, t0 + 0.015)
+  env.gain.setValueAtTime(peak, t1 - 0.015)
+  env.gain.linearRampToValueAtTime(0, t1)
+
+  const merger = ctx.createChannelMerger(2)
+  const { l, r } = earGains(ear)
+  const leftNode = ctx.createGain()
+  const rightNode = ctx.createGain()
+  leftNode.gain.value = l
+  rightNode.gain.value = r
+
+  osc.connect(env)
+  env.connect(leftNode)
+  env.connect(rightNode)
+  leftNode.connect(merger, 0, 0)
+  rightNode.connect(merger, 0, 1)
+  merger.connect(ctx.destination)
+
+  osc.start(t0)
+  osc.stop(t1 + 0.02)
+  return new Promise(resolve => setTimeout(resolve, duration_ms + 60))
+}
+
+/**
+ * Reproduce un estímulo grabado (AudioBuffer) al nivel SPL indicado.
+ * Usa RMS del archivo para mapear a nivel clínico:
+ *   output_rms_spl = ref_db + rms_dbfs + 20·log10(gain)
+ * Para obtener level_db SPL: gain = 10^((level_db − ref − rms_dbfs)/20)
+ * Si rms_dbfs no está medido, asume −20 dBFS (target post-normalización).
+ */
+export async function playStimulusBuffer(
+  buffer: AudioBuffer,
+  level_db: number,
+  opts: { ear?: Ear; rms_dbfs?: number | null; refDb?: number; onEnd?: () => void } = {}
+): Promise<() => void> {
+  const ctx = await ensureRunning()
+  const ear = opts.ear ?? 'binaural'
+  const rms = opts.rms_dbfs ?? -20
+  const ref = opts.refDb ?? resolveRefDb(1000, ear)
+  const gain = dbToGain(level_db - rms, ref)
+
+  const src = ctx.createBufferSource()
+  src.buffer = buffer
+  const g = ctx.createGain()
+  g.gain.value = gain
+
+  const merger = ctx.createChannelMerger(2)
+  const { l, r } = earGains(ear)
+  const leftNode = ctx.createGain()
+  const rightNode = ctx.createGain()
+  leftNode.gain.value = l
+  rightNode.gain.value = r
+
+  src.connect(g)
+  g.connect(leftNode)
+  g.connect(rightNode)
+  leftNode.connect(merger, 0, 0)
+  rightNode.connect(merger, 0, 1)
+  merger.connect(ctx.destination)
+
+  src.onended = () => opts.onEnd?.()
+  src.start()
+  return () => { try { src.stop() } catch {} }
+}
+
+let stimulusBufferCache = new Map<string, AudioBuffer>()
+
+export async function loadStimulusBuffer(absPath: string, bytes: Uint8Array): Promise<AudioBuffer> {
+  const cached = stimulusBufferCache.get(absPath)
+  if (cached) return cached
+  const ctx = await ensureRunning()
+  const ab = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)
+  const buf = await ctx.decodeAudioData(ab as ArrayBuffer)
+  stimulusBufferCache.set(absPath, buf)
+  return buf
+}
+
+export function clearStimulusCache() {
+  stimulusBufferCache = new Map()
+}
+
+/**
+ * Tono continuo para calibración con sonómetro. gain lineal = 10^(dbfs/20),
+ * sin mapeo SPL (no usa dbToGain). Devuelve función stop.
+ */
+export async function playCalibrationTone(
+  frequency: number,
+  dbfs: number,
+  ear: Ear = 'binaural'
+): Promise<() => void> {
+  const ctx = await ensureRunning()
+  const osc = ctx.createOscillator()
+  osc.type = 'sine'
+  osc.frequency.value = frequency
+
+  const gain = ctx.createGain()
+  gain.gain.value = Math.pow(10, dbfs / 20)
+
+  const merger = ctx.createChannelMerger(2)
+  const { l, r } = earGains(ear)
+  const leftNode = ctx.createGain()
+  const rightNode = ctx.createGain()
+  leftNode.gain.value = l
+  rightNode.gain.value = r
+
+  osc.connect(gain)
+  gain.connect(leftNode)
+  gain.connect(rightNode)
+  leftNode.connect(merger, 0, 0)
+  rightNode.connect(merger, 0, 1)
+  merger.connect(ctx.destination)
+
+  osc.start()
+  return () => {
+    try { osc.stop() } catch {}
+  }
 }

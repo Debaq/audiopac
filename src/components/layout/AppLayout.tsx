@@ -1,6 +1,7 @@
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
-import { Users, Activity, Settings2, FileText, LogOut, Home, AudioLines } from 'lucide-react'
+import { Users, Activity, Settings2, FileText, LogOut, Home, AudioLines, Gauge, AlertTriangle, CheckCircle2, Mic } from 'lucide-react'
 import { useAuth } from '@/stores/auth'
+import { useCalibrationStore } from '@/stores/calibration'
 import { cn } from '@/lib/utils'
 
 const navItems = [
@@ -9,16 +10,27 @@ const navItems = [
   { to: '/evaluacion', label: 'Evaluación', icon: Activity },
   { to: '/tests', label: 'Tests', icon: Settings2 },
   { to: '/informes', label: 'Informes', icon: FileText },
+  { to: '/estimulos', label: 'Estímulos', icon: Mic },
+  { to: '/calibracion', label: 'Calibración', icon: Gauge },
 ]
 
 export function AppLayout() {
   const { activeProfile, logout } = useAuth()
+  const { active, status, ageDays } = useCalibrationStore()
   const navigate = useNavigate()
 
   const handleLogout = () => {
     logout()
     navigate('/')
   }
+
+  const calMessage = (() => {
+    if (status === 'none') return 'Sin calibración — usando 85 dB por defecto'
+    if (status === 'expired') return `Calibración vencida (${ageDays}d) — recalibrar`
+    if (status === 'device_mismatch') return 'Dispositivo cambió — recalibrar'
+    return `${active?.label} · ${active?.ref_db_spl.toFixed(0)} dB · hace ${ageDays}d`
+  })()
+  const calBad = status !== 'ok'
 
   return (
     <div className="flex h-screen bg-[var(--background)] bg-waves">
@@ -64,6 +76,22 @@ export function AppLayout() {
             </NavLink>
           ))}
         </nav>
+
+        <div className="px-3 pb-2">
+          <Link
+            to="/calibracion"
+            className={cn(
+              'flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs border transition-colors',
+              calBad
+                ? 'bg-red-500/10 border-red-500/40 text-red-600 hover:bg-red-500/15'
+                : 'bg-emerald-500/5 border-emerald-500/30 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/10'
+            )}
+            title={calMessage}
+          >
+            {calBad ? <AlertTriangle className="w-3.5 h-3.5 shrink-0" /> : <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />}
+            <span className="truncate">{calMessage}</span>
+          </Link>
+        </div>
 
         {activeProfile && (
           <div className="p-3">

@@ -30,10 +30,31 @@ export interface Patient {
   updated_at: string
 }
 
+export type NoiseType = 'white' | 'pink' | 'narrow'
+
+export interface NoiseMix {
+  noise_type: NoiseType
+  level_db: number
+  center_hz?: number
+  bandwidth_hz?: number
+}
+
 export interface ToneDefinition {
   label: string
   duration_ms?: number
   frequency?: number
+  level_db?: number
+  ear?: Ear
+  gain_l?: number
+  gain_r?: number
+  kind?: 'tone' | 'noise'
+  noise_type?: NoiseType
+  center_hz?: number
+  bandwidth_hz?: number
+  gap_at_ms?: number
+  gap_width_ms?: number
+  noise_mix?: NoiseMix
+  phase_invert_right?: boolean
 }
 
 export interface TestConfig {
@@ -82,8 +103,22 @@ export interface TestSession {
   correct_items: number
   notes: string | null
   config_snapshot: string | null
+  calibration_id: number | null
+  ref_db_snapshot: number | null
+  calibration_curve_snapshot: string | null
   started_at: string
   completed_at: string | null
+}
+
+export interface CalibrationPoint {
+  id: number
+  calibration_id: number
+  frequency_hz: number
+  ear: Ear
+  internal_level_dbfs: number
+  measured_db_spl: number
+  ref_db_spl: number
+  created_at: string
 }
 
 export interface TestResponse {
@@ -102,4 +137,53 @@ export interface SessionWithDetails extends TestSession {
   patient_name: string
   template_name: string
   profile_name: string
+}
+
+export type StimulusCategory = 'srt' | 'discrimination' | 'dichotic_digits' | 'sentence' | 'custom'
+
+export interface StimulusList {
+  id: number
+  code: string
+  name: string
+  category: StimulusCategory
+  language: string
+  country_code: string | null
+  description: string | null
+  is_standard: number
+  is_active: number
+  created_by: number | null
+  created_at: string
+}
+
+export interface Stimulus {
+  id: number
+  list_id: number
+  position: number
+  token: string
+  file_path: string | null
+  duration_ms: number | null
+  rms_dbfs: number | null
+  peak_dbfs: number | null
+  sample_rate: number | null
+  normalized: number
+  created_at: string
+  updated_at: string
+}
+
+export interface Calibration {
+  id: number
+  label: string
+  device_id: string | null
+  device_label: string | null
+  headphone_model: string | null
+  ear: Ear
+  frequency_hz: number
+  internal_level_dbfs: number
+  measured_db_spl: number
+  ref_db_spl: number
+  is_active: number
+  created_by: number | null
+  created_at: string
+  valid_until: string | null
+  notes: string | null
 }

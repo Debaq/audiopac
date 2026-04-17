@@ -86,7 +86,7 @@ export function TestEditorPage() {
     setTestText(testSeqs.join('\n'))
   }
 
-  const updateTone = (key: string, field: keyof TestConfig['tones'][string], value: string | number) => {
+  const updateTone = (key: string, field: keyof TestConfig['tones'][string], value: string | number | undefined) => {
     setConfig({
       ...config,
       tones: { ...config.tones, [key]: { ...config.tones[key], [field]: value } },
@@ -116,7 +116,11 @@ export function TestEditorPage() {
     const t = config.tones[key]
     const freq = t.frequency ?? config.frequency ?? 1000
     const dur = t.duration_ms ?? config.duration_ms ?? 400
-    await playTonePreview(freq, dur, config.level_db)
+    await playTonePreview(freq, dur, t.level_db ?? config.level_db, {
+      ear: t.ear ?? config.channel,
+      gain_l: t.gain_l,
+      gain_r: t.gain_r,
+    })
   }
 
   const previewSequence = async (seq: string) => {
@@ -192,32 +196,57 @@ export function TestEditorPage() {
         <CardContent>
           <div className="space-y-3 mb-3">
             {Object.entries(config.tones).map(([key, tone]) => (
-              <div key={key} className="grid grid-cols-12 gap-2 items-end p-3 bg-[var(--secondary)] rounded-lg">
-                <div className="col-span-1">
-                  <Label>Clave</Label>
-                  <Input value={key} onChange={e => renameTone(key, e.target.value.toUpperCase())} maxLength={1} disabled={isStandard} className="text-center font-bold" />
-                </div>
-                <div className="col-span-3">
-                  <Label>Etiqueta</Label>
-                  <Input value={tone.label} onChange={e => updateTone(key, 'label', e.target.value)} disabled={isStandard} />
-                </div>
-                <div className="col-span-3">
-                  <Label>Frecuencia (Hz)</Label>
-                  <Input type="number" value={tone.frequency ?? ''} placeholder={String(config.frequency ?? '')} onChange={e => updateTone(key, 'frequency', Number(e.target.value))} disabled={isStandard} />
-                </div>
-                <div className="col-span-3">
-                  <Label>Duración (ms)</Label>
-                  <Input type="number" value={tone.duration_ms ?? ''} placeholder={String(config.duration_ms ?? '')} onChange={e => updateTone(key, 'duration_ms', Number(e.target.value))} disabled={isStandard} />
-                </div>
-                <div className="col-span-2 flex gap-1">
-                  <Button size="sm" variant="outline" type="button" onClick={() => previewTone(key)}>
-                    <Play className="w-3 h-3" />
-                  </Button>
-                  {!isStandard && (
-                    <Button size="sm" variant="destructive" type="button" onClick={() => removeTone(key)}>
-                      <Trash2 className="w-3 h-3" />
+              <div key={key} className="p-3 bg-[var(--secondary)] rounded-lg space-y-2">
+                <div className="grid grid-cols-12 gap-2 items-end">
+                  <div className="col-span-1">
+                    <Label>Clave</Label>
+                    <Input value={key} onChange={e => renameTone(key, e.target.value.toUpperCase())} maxLength={1} disabled={isStandard} className="text-center font-bold" />
+                  </div>
+                  <div className="col-span-3">
+                    <Label>Etiqueta</Label>
+                    <Input value={tone.label} onChange={e => updateTone(key, 'label', e.target.value)} disabled={isStandard} />
+                  </div>
+                  <div className="col-span-3">
+                    <Label>Frecuencia (Hz)</Label>
+                    <Input type="number" value={tone.frequency ?? ''} placeholder={String(config.frequency ?? '')} onChange={e => updateTone(key, 'frequency', Number(e.target.value))} disabled={isStandard} />
+                  </div>
+                  <div className="col-span-3">
+                    <Label>Duración (ms)</Label>
+                    <Input type="number" value={tone.duration_ms ?? ''} placeholder={String(config.duration_ms ?? '')} onChange={e => updateTone(key, 'duration_ms', Number(e.target.value))} disabled={isStandard} />
+                  </div>
+                  <div className="col-span-2 flex gap-1">
+                    <Button size="sm" variant="outline" type="button" onClick={() => previewTone(key)}>
+                      <Play className="w-3 h-3" />
                     </Button>
-                  )}
+                    {!isStandard && (
+                      <Button size="sm" variant="destructive" type="button" onClick={() => removeTone(key)}>
+                        <Trash2 className="w-3 h-3" />
+                      </Button>
+                    )}
+                  </div>
+                </div>
+                <div className="grid grid-cols-12 gap-2 items-end">
+                  <div className="col-span-3">
+                    <Label className="text-[10px]">Nivel dB (override)</Label>
+                    <Input type="number" value={tone.level_db ?? ''} placeholder={String(config.level_db)} onChange={e => updateTone(key, 'level_db', e.target.value === '' ? undefined : Number(e.target.value))} disabled={isStandard} />
+                  </div>
+                  <div className="col-span-3">
+                    <Label className="text-[10px]">Oído (override)</Label>
+                    <Select value={tone.ear ?? ''} onChange={e => updateTone(key, 'ear', e.target.value === '' ? undefined : e.target.value)} disabled={isStandard}>
+                      <option value="">(sesión)</option>
+                      <option value="left">Izquierdo</option>
+                      <option value="right">Derecho</option>
+                      <option value="binaural">Binaural</option>
+                    </Select>
+                  </div>
+                  <div className="col-span-3">
+                    <Label className="text-[10px]">Gain L (0-1)</Label>
+                    <Input type="number" step="0.1" min="0" max="1" value={tone.gain_l ?? ''} placeholder="—" onChange={e => updateTone(key, 'gain_l', e.target.value === '' ? undefined : Number(e.target.value))} disabled={isStandard} />
+                  </div>
+                  <div className="col-span-3">
+                    <Label className="text-[10px]">Gain R (0-1)</Label>
+                    <Input type="number" step="0.1" min="0" max="1" value={tone.gain_r ?? ''} placeholder="—" onChange={e => updateTone(key, 'gain_r', e.target.value === '' ? undefined : Number(e.target.value))} disabled={isStandard} />
+                  </div>
                 </div>
               </div>
             ))}

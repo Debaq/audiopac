@@ -8,16 +8,21 @@ export interface CreateSessionInput {
   ear?: Ear
   response_mode?: ResponseMode
   config_snapshot?: string
+  calibration_id?: number | null
+  ref_db_snapshot?: number | null
+  calibration_curve_snapshot?: string | null
 }
 
 export async function createSession(input: CreateSessionInput): Promise<number> {
   const db = await getDb()
   const res = await db.execute(
-    `INSERT INTO test_sessions (patient_id, template_id, profile_id, ear, response_mode, config_snapshot)
-     VALUES ($1,$2,$3,$4,$5,$6)`,
+    `INSERT INTO test_sessions (patient_id, template_id, profile_id, ear, response_mode, config_snapshot, calibration_id, ref_db_snapshot, calibration_curve_snapshot)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
     [
       input.patient_id, input.template_id, input.profile_id,
       input.ear ?? 'binaural', input.response_mode ?? 'verbal', input.config_snapshot ?? null,
+      input.calibration_id ?? null, input.ref_db_snapshot ?? null,
+      input.calibration_curve_snapshot ?? null,
     ]
   )
   return res.lastInsertId ?? 0
