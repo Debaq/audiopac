@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
-import { getSession, finishSession, cancelSession, saveResponse } from '@/lib/db/sessions'
+import { getSession, finishSession, cancelSession, saveResponse, listResponses } from '@/lib/db/sessions'
 import { getTemplate } from '@/lib/db/templates'
 import { getPatient } from '@/lib/db/patients'
 import { TestRunner, type RunnerState } from '@/lib/audio/runner'
@@ -44,6 +44,8 @@ export function EvaluationRunPage() {
       if (t) {
         const r = new TestRunner(t.config, s.ear, 'practice')
         runnerRef.current = r
+        const prev = await listResponses(sid)
+        if (prev.length > 0) r.hydrate(prev)
         setState({ ...r.state })
         const unsub = r.subscribe(setState)
         return () => { unsub() }

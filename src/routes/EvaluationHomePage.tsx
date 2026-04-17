@@ -1,15 +1,16 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Activity, Ear as EarIcon } from 'lucide-react'
+import { Activity, Ear as EarIcon, Clock, Play, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
 import { listPatients } from '@/lib/db/patients'
 import { listTemplates } from '@/lib/db/templates'
-import { createSession } from '@/lib/db/sessions'
+import { createSession, listInProgressSessions, cancelSession } from '@/lib/db/sessions'
 import { useAuth } from '@/stores/auth'
-import type { Patient, TestTemplateParsed, Ear, ResponseMode } from '@/types'
+import type { Patient, TestTemplateParsed, Ear, ResponseMode, SessionWithDetails } from '@/types'
+import { formatDateTime } from '@/lib/utils'
 
 export function EvaluationHomePage() {
   const navigate = useNavigate()
@@ -18,6 +19,7 @@ export function EvaluationHomePage() {
 
   const [patients, setPatients] = useState<Patient[]>([])
   const [templates, setTemplates] = useState<TestTemplateParsed[]>([])
+  const [pending, setPending] = useState<SessionWithDetails[]>([])
   const [patientId, setPatientId] = useState<number | ''>('')
   const [templateId, setTemplateId] = useState<number | ''>('')
   const [ear, setEar] = useState<Ear>('binaural')
@@ -25,13 +27,20 @@ export function EvaluationHomePage() {
   const [starting, setStarting] = useState(false)
 
   useEffect(() => {
-    Promise.all([listPatients(), listTemplates(true)]).then(([p, t]) => {
+    Promise.all([listPatients(), listTemplates(true), listInProgressSessions()]).then(([p, t, ip]) => {
       setPatients(p)
       setTemplates(t)
+      setPending(ip)
       const urlP = params.get('patient')
       if (urlP) setPatientId(Number(urlP))
     })
   }, [])
+
+  const discardPending = async (id: number) => {
+    if (!confirm('¿Descartar evaluación pendiente? No se podrá retomar.')) return
+    await cancelSession(id)
+    setPending(prev => prev.filter(s => s.id !== id))
+  }
 
   const selectedTemplate = useMemo(
     () => templates.find(t => t.id === templateId) ?? null,
@@ -63,6 +72,37 @@ export function EvaluationHomePage() {
         <h1 className="text-3xl font-bold">Nueva evaluación</h1>
         <p className="text-[var(--muted-foreground)]">Configura los parámetros e inicia el test</p>
       </div>
+
+      {pending.length > 0 && (
+        <Card className="mb-6 border-2 border-amber-400/60 bg-amber-50/50 dark:bg-amber-950/10">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-amber-900 dark:text-amber-200">
+              <Clock className="w-5 h-5" /> Evaluaciones pendientes ({pending.length})
+            </CardTitle>
+            <CardDescription>Sesiones iniciadas sin finalizar. Retoma donde las dejaste.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {pending.map(s => (
+              <div key={s.id} className="flex items-center justify-between p-3 rounded-lg bg-[var(--card)] border border-[var(--border)]">
+                <div>
+                  <div className="font-semibold">{s.patient_name}</div>
+                  <div className="text-xs text-[var(--muted-foreground)]">
+                    {s.template_name} · Oído: {s.ear} · {formatDateTime(s.started_at)}
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <Button size="sm" onClick={() => navigate(`/evaluacion/${s.id}`)}>
+                    <Play className="w-4 h-4" /> Retomar
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => discardPending(s.id)}>
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
 
       <Card className="mb-6">
         <CardHeader><CardTitle>Paciente y test</CardTitle></CardHeader>

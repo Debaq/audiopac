@@ -79,6 +79,24 @@ export class TestRunner {
     }
   }
 
+  hydrate(responses: Array<{ item_index: number; phase: Phase; given_pattern: string | null; is_correct: number | null }>) {
+    for (const r of responses) {
+      const item = this.state.items.find(i => i.phase === r.phase && i.index === r.item_index)
+      if (!item) continue
+      item.given = r.given_pattern ?? undefined
+      item.correct = r.is_correct === null ? undefined : !!r.is_correct
+    }
+    const firstUnanswered = this.state.items.findIndex(i => i.correct === undefined)
+    if (firstUnanswered === -1) {
+      this.state.currentIndex = this.state.items.length - 1
+      this.state.finished = true
+    } else {
+      this.state.currentIndex = firstUnanswered
+      this.state.phase = this.state.items[firstUnanswered].phase
+    }
+    this.emit()
+  }
+
   goto(index: number) {
     if (index < 0 || index >= this.state.items.length) return
     this.state.currentIndex = index

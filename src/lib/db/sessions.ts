@@ -46,6 +46,22 @@ export async function listSessionsByPatient(patientId: number): Promise<SessionW
   )
 }
 
+export async function listInProgressSessions(): Promise<SessionWithDetails[]> {
+  const db = await getDb()
+  return db.select<SessionWithDetails[]>(
+    `SELECT s.*,
+            (p.first_name || ' ' || p.last_name) AS patient_name,
+            t.name AS template_name,
+            pr.name AS profile_name
+     FROM test_sessions s
+     JOIN patients p ON p.id = s.patient_id
+     JOIN test_templates t ON t.id = s.template_id
+     JOIN profiles pr ON pr.id = s.profile_id
+     WHERE s.status = 'in_progress'
+     ORDER BY s.started_at DESC`
+  )
+}
+
 export async function listAllSessions(limit = 100): Promise<SessionWithDetails[]> {
   const db = await getDb()
   return db.select<SessionWithDetails[]>(
