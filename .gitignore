@@ -36,3 +36,11 @@ src-tauri/gen/schemas/
 # Env
 .env
 .env.local
+
+# Signing certificates (NEVER commit)
+.signing/
+*.pfx
+*.p12
+*.key
+*.pem
+!src-tauri/icons/**/*.icns

@@ -2,64 +2,228 @@ name: Release
 
 on:
   push:
-    tags:
-      - 'v*'
+    tags: ['v*']
   workflow_dispatch:
 
-jobs:
-  build:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - platform: 'ubuntu-22.04'
-            args: ''
-          - platform: 'windows-latest'
-            args: ''
-          - platform: 'macos-latest'
-            args: '--target universal-apple-darwin'
+permissions:
+  contents: write
 
-    runs-on: ${{ matrix.platform }}
+jobs:
+  # ────────────────────────────────────────────────────────────────
+  # Linux: AppImage portable
+  # ────────────────────────────────────────────────────────────────
+  build-linux:
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
+      - name: Read version
+        run: echo "APP_VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_ENV
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            patchelf
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: pnpm/action-setup@v4
         with:
           version: 10
 
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+      - uses: dtolnay/rust-toolchain@stable
 
-      - name: Rust cache
-        uses: swatinem/rust-cache@v2
+      - uses: swatinem/rust-cache@v2
         with:
-          workspaces: './src-tauri -> target'
+          workspaces: src-tauri -> target
 
-      - name: Install Linux deps
-        if: matrix.platform == 'ubuntu-22.04'
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build Tauri (AppImage only)
+        run: pnpm tauri build --bundles appimage
+        env:
+          CARGO_HTTP_TIMEOUT: 300
+          CARGO_NET_RETRY: 5
+
+      - name: Prepare Linux artifacts
         run: |
-          sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libayatana-appindicator3-dev
+          mkdir -p artifacts
+          # Binario raw
+          cp src-tauri/target/release/audiopac \
+             artifacts/AudioPAC-v${APP_VERSION}-linux-x86_64
+          chmod +x artifacts/AudioPAC-v${APP_VERSION}-linux-x86_64
+          # AppImage
+          for f in src-tauri/target/release/bundle/appimage/*.AppImage; do
+            [ -f "$f" ] && cp "$f" "artifacts/AudioPAC-v${APP_VERSION}-linux-x86_64.AppImage"
+          done
+          chmod +x artifacts/*.AppImage 2>/dev/null || true
+          ls -lh artifacts/
 
-      - name: Install frontend deps
-        run: pnpm install
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: audiopac-linux
+          path: artifacts/*
+          retention-days: 30
 
-      - name: Build Tauri
-        uses: tauri-apps/tauri-action@v0
+  # ────────────────────────────────────────────────────────────────
+  # Windows: NSIS installer + MSI + firma código
+  # ────────────────────────────────────────────────────────────────
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read version
+        shell: pwsh
+        run: |
+          $version = "${env:GITHUB_REF_NAME}" -replace '^v', ''
+          echo "APP_VERSION=$version" >> $env:GITHUB_ENV
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Decode signing certificate
+        shell: pwsh
+        env:
+          CERT_BASE64: ${{ secrets.WINDOWS_CERT_BASE64 }}
+        run: |
+          if ($env:CERT_BASE64) {
+            [System.IO.File]::WriteAllBytes("$pwd\audiopac-signing.pfx", [System.Convert]::FromBase64String($env:CERT_BASE64))
+            Write-Host "✓ Certificate decoded"
+          } else {
+            Write-Host "⚠ No signing certificate configured — build will be unsigned"
+          }
+
+      - name: Build Tauri (NSIS + MSI)
+        run: pnpm tauri build --bundles nsis,msi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CARGO_HTTP_TIMEOUT: 300
+          CARGO_NET_RETRY: 5
+
+      - name: Sign Windows binaries
+        shell: pwsh
+        env:
+          CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
+        run: |
+          if (-not (Test-Path "audiopac-signing.pfx")) {
+            Write-Host "⚠ No certificate found, skipping signing"
+            exit 0
+          }
+
+          $signtool = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin" -Recurse -Filter "signtool.exe" -ErrorAction SilentlyContinue | Where-Object { $_.FullName -like "*\x64\*" } | Select-Object -First 1
+          if (-not $signtool) {
+            Write-Host "✗ signtool.exe x64 not found"
+            exit 1
+          }
+          $st = $signtool.FullName
+          Write-Host "Using signtool: $st"
+
+          # Firmar binario principal + NSIS installer + MSI
+          $targets = @()
+          $targets += Get-ChildItem "src-tauri\target\release\audiopac.exe" -ErrorAction SilentlyContinue
+          $targets += Get-ChildItem "src-tauri\target\release\bundle\nsis\*.exe" -ErrorAction SilentlyContinue
+          $targets += Get-ChildItem "src-tauri\target\release\bundle\msi\*.msi" -ErrorAction SilentlyContinue
+
+          foreach ($file in $targets) {
+            Write-Host "Signing: $($file.FullName)"
+            & $st sign `
+              /f audiopac-signing.pfx `
+              /p $env:CERT_PASSWORD `
+              /tr http://timestamp.digicert.com `
+              /td sha256 `
+              /fd sha256 `
+              /d "AudioPAC" `
+              /du "https://github.com/Debaq/audiopac" `
+              $file.FullName
+            if ($LASTEXITCODE -ne 0) { throw "Signing failed for $($file.FullName)" }
+
+            & $st verify /pa /v $file.FullName
+          }
+
+          Remove-Item audiopac-signing.pfx -Force
+          Write-Host "✓ All binaries signed and cert cleaned"
+
+      - name: Rename artifacts with version
+        shell: pwsh
+        run: |
+          Get-ChildItem src-tauri/target/release/bundle/nsis/*.exe | ForEach-Object {
+            $newPath = Join-Path $_.DirectoryName "AudioPAC-v$env:APP_VERSION-windows-x86_64-setup.exe"
+            Move-Item $_.FullName $newPath -Force
+          }
+          Get-ChildItem src-tauri/target/release/bundle/msi/*.msi | ForEach-Object {
+            $newPath = Join-Path $_.DirectoryName "AudioPAC-v$env:APP_VERSION-windows-x86_64.msi"
+            Move-Item $_.FullName $newPath -Force
+          }
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: 'AudioPAC ${{ github.ref_name }}'
-          releaseBody: 'Descarga los binarios para tu plataforma desde los assets.'
-          releaseDraft: true
+          name: audiopac-windows
+          path: |
+            src-tauri/target/release/bundle/nsis/*.exe
+            src-tauri/target/release/bundle/msi/*.msi
+          retention-days: 30
+
+  # ────────────────────────────────────────────────────────────────
+  # Crear GitHub Release con todos los artefactos
+  # ────────────────────────────────────────────────────────────────
+  release:
+    needs: [build-linux, build-windows]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read version
+        run: echo "APP_VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_ENV
+
+      - name: Download Linux artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: audiopac-linux
+          path: dist/linux
+
+      - name: Download Windows artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: audiopac-windows
+          path: dist/windows
+
+      - name: List artifacts
+        run: find dist -type f
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: AudioPAC v${{ env.APP_VERSION }}
+          generate_release_notes: true
+          draft: false
           prerelease: false
-          args: ${{ matrix.args }}
+          files: |
+            dist/linux/*
+            dist/windows/**/*.exe
+            dist/windows/**/*.msi
