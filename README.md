@@ -18,13 +18,15 @@ Binarios oficiales en la [página de releases](https://github.com/Debaq/audiopac
 - **Windows**: `AudioPAC-vX.Y.Z-windows-x86_64-setup.exe` (NSIS) o `.msi`
 - **Linux**: `AudioPAC-vX.Y.Z-linux-x86_64.AppImage` (portable) o binario raw
 
+### Firma de código
+
+Los binarios Windows están firmados con certificado de código proporcionado por **[SignPath Foundation](https://signpath.org/)** como parte de su programa de sponsorship gratuito para proyectos open source.
+
 ### Instalación Windows
 
-Si SmartScreen muestra "Windows protegió tu PC":
+Si SmartScreen muestra "Windows protegió tu PC" (solo en versiones preliminares sin firmar):
 1. Clic en **Más información**
 2. Clic en **Ejecutar de todas formas**
-
-Trabajamos para obtener un certificado de firma de código de SignPath Foundation que eliminará este paso.
 
 ### Instalación Linux
 
@@ -120,6 +122,10 @@ scripts/
 ## Contribuir
 
 Issues y pull requests bienvenidos. Este es software clínico — cualquier cambio en la lógica de los tests debe preservar fidelidad a los protocolos estándar (Musiek para DPS, Pinheiro para PPS).
+
+## Privacidad
+
+AudioPAC es 100% local y offline. No recopila telemetría ni envía datos a servidores. Ver [PRIVACY.md](./PRIVACY.md).
 
 ## Licencia
 

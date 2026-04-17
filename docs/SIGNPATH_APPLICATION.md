@@ -1,57 +1,122 @@
 # Solicitud a SignPath Foundation
 
-SignPath Foundation ofrece firma de código **gratuita con cert EV** (Extended Validation) para proyectos open source. Con EV, Windows SmartScreen confía **instantáneamente** — sin construcción de reputación.
+Valores listos para copiar-pegar en https://signpath.org/foundation
 
-## Requisitos (verificados)
+## Campos del formulario
 
-- ✅ Repo público en GitHub (`Debaq/audiopac`)
-- ✅ Licencia open source aprobada (MIT)
-- ✅ Desarrollo activo (commits recientes)
-- ✅ Proyecto útil y de buena fe (software clínico)
-- ✅ README claro con instrucciones
-- ✅ No malware, no dual-use problemático
+### Project Name *
+```
+AudioPAC
+```
 
-## Cómo aplicar
+### Repository URL *
+```
+https://github.com/Debaq/audiopac
+```
 
-1. Ir a https://signpath.org/foundation
-2. Clic en **Apply for Sponsorship**
-3. Completar formulario:
+### Homepage URL *
+```
+https://github.com/Debaq/audiopac
+```
 
-### Project Information
+### Download URL
+```
+https://github.com/Debaq/audiopac/releases
+```
+(El README ya menciona: "Los binarios Windows están firmados con certificado de código proporcionado por SignPath Foundation")
 
-| Campo | Valor |
-|-------|-------|
-| **Project name** | AudioPAC |
-| **Project URL** | https://github.com/Debaq/audiopac |
-| **License** | MIT |
-| **Description** | Software open-source multiplataforma para evaluación del Procesamiento Auditivo Central (PAC). Implementa los tests clínicos estándar DPS (Duration Pattern Sequence) y PPS (Pitch Pattern Sequence) usados en audiología y fonoaudiología para diagnóstico de trastornos de procesamiento auditivo. Desarrollado con Tauri v2, React y SQLite local. |
-| **Artifacts to sign** | Windows NSIS installer (.exe) + MSI |
-| **Build system** | GitHub Actions |
-| **Target users** | Profesionales de la salud (audiólogos, fonoaudiólogos), investigadores, centros clínicos y universidades |
+### Privacy Policy URL
+```
+https://github.com/Debaq/audiopac/blob/main/PRIVACY.md
+```
 
-### Why you need signing
+### Wikipedia URL
+*(dejar vacío)*
 
-> Our users are healthcare professionals who need to install AudioPAC on clinical workstations, often in institutional environments with strict IT policies. Unsigned installers trigger Windows SmartScreen warnings and are blocked by many corporate antivirus solutions, preventing adoption in clinical settings where the software is most needed.
+### Tagline *
+```
+Software clínico open-source para evaluación del Procesamiento Auditivo Central (DPS/PPS)
+```
 
-### Open source commitment
+### Description *
+```
+AudioPAC es software open-source multiplataforma para la evaluación del Procesamiento Auditivo Central en entornos clínicos y de investigación. Implementa los tests estándar Duration Pattern Sequence (DPS) y Pitch Pattern Sequence (PPS) usados por audiólogos y fonoaudiólogos para diagnóstico de trastornos del procesamiento auditivo central. Permite parámetros totalmente configurables para investigación, gestión de pacientes, generación de informes clínicos en PDF y exportación de datos para análisis estadístico. Funciona 100% offline con base de datos local SQLite, sin telemetría ni envío de datos a servidores.
+```
 
-- Repo público bajo MIT
-- Issues abiertos
-- Documentación en español + inglés progresivo
-- Pull requests bienvenidos
+### Reputation *
+```
+AudioPAC es un proyecto clínico activo en desarrollo inicial, construido para llenar un vacío real en el ecosistema de software audiológico open-source en español. Los tests DPS y PPS son procedimientos estándar enseñados en programas universitarios de fonoaudiología y audiología en Latinoamérica, pero los softwares comerciales existentes son costosos ($500-2000 USD por licencia) y cerrados, lo que limita su uso en universidades públicas, centros de salud de bajos recursos y proyectos de investigación.
+
+El proyecto se desarrolla con estándares profesionales: CI/CD completo en GitHub Actions, TypeScript strict, arquitectura modular Tauri+React, base de datos SQLite con migraciones versionadas, y documentación técnica extensa. El código fuente y la documentación están disponibles públicamente bajo licencia MIT.
+
+Target inicial: profesionales clínicos, estudiantes de fonoaudiología e investigadores en Chile y Latinoamérica. La obtención de firma de código es crítica para adopción en entornos hospitalarios e institucionales donde las políticas de IT bloquean ejecutables sin firmar.
+
+Enlaces:
+- Repositorio: https://github.com/Debaq/audiopac
+- Releases: https://github.com/Debaq/audiopac/releases
+- Documentación técnica: https://github.com/Debaq/audiopac/tree/main/docs
+```
+
+### Maintainer Type
+```
+Individual
+```
+*(o "Informal group" si colaboras con otros)*
+
+### Build System
+```
+GitHub Actions
+```
+
+### First Name *
+**[TU NOMBRE]**
+
+### Last Name *
+**[TU APELLIDO]**
+
+### Email *
+**[TU EMAIL]**
+
+### Company Name
+*(opcional - dejar vacío si no aplica, o nombre de tu universidad/institución)*
+
+### Primary Discovery Channel *
+Opciones típicas: "Search engine", "GitHub", "Recommendation", "Blog/article"
+
+### Please specify the exact source
+```
+Recomendación de otro proyecto open source que usa SignPath Foundation
+```
+*(o lo que corresponda a la realidad)*
+
+### Checkboxes
+- ☑ **Code of Conduct** — marcar (obligatorio)
+- ☐ I agree to receive other communications — opcional, tu decisión
+- ☑ **Store and process personal data** — marcar (obligatorio)
+
+## Info necesaria de ti
+
+Para completar el formulario necesito:
+
+1. **First Name** y **Last Name** reales
+2. **Email** para la cuenta SignPath
+3. **Company Name** (opcional — universidad, centro clínico, o dejar vacío)
+4. **Primary Discovery Channel** y fuente específica
+
+Si me das esos 4 datos, genero el texto final listo para copy-paste.
 
 ## Tras aprobación
 
 SignPath te creará:
 - Organization ID
-- Project en signpath.io
-- Signing policy (usualmente "release-signing")
+- Project en signpath.io (slug: `audiopac`)
+- Signing policy (usualmente `release-signing`)
 
-Luego configuras GitHub Secrets:
+Luego configuras en GitHub → Settings → Secrets:
 - `SIGNPATH_ORGANIZATION_ID`
 - `SIGNPATH_PROJECT_SLUG` = `audiopac`
 - `SIGNPATH_SIGNING_POLICY_SLUG` = `release-signing`
-- `SIGNPATH_API_TOKEN` (si no usas OIDC trust relationship)
+- `SIGNPATH_API_TOKEN` (si no usan OIDC trust relationship)
 
 Y activas el workflow:
 ```bash
@@ -60,20 +125,3 @@ mv .github/workflows/release-signpath.yml.disabled .github/workflows/release.yml
 git commit -am "chore: activar firma SignPath Foundation"
 git push
 ```
-
-## Tiempo estimado
-
-- Aplicación → aprobación: días a 2 semanas
-- Setup tras aprobación: ~30 min
-
-## Mientras tanto
-
-El workflow actual (`release.yml`) funciona sin firma. Los users verán SmartScreen la primera vez pero pueden hacer "Más info → Ejecutar de todas formas". El README ya documenta esto.
-
-## Alternativa paga si rechazan
-
-Si SignPath rechaza (raro para proyecto clínico serio):
-- **Azure Trusted Signing**: ~$10 USD/mes, confianza SmartScreen instantánea equivalente a EV
-- **SSL.com OV**: ~$130 USD/año, construcción gradual de reputación
-
-Ver `docs/SIGNING.md` para configuración alternativa.
