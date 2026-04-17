@@ -49,32 +49,23 @@ pub fn run() {
             #[cfg(target_os = "windows")]
             {
                 use webview2_com::{
-                    Microsoft::Web::WebView2::Win32::{
-                        COREWEBVIEW2_PERMISSION_STATE_ALLOW, ICoreWebView2_13,
-                        ICoreWebView2PermissionRequestedEventHandler,
-                    },
+                    Microsoft::Web::WebView2::Win32::COREWEBVIEW2_PERMISSION_STATE_ALLOW,
                     PermissionRequestedEventHandler,
                 };
-                use windows::core::Interface;
 
                 for (_, window) in app.webview_windows() {
-                    let _ = window.with_webview(|webview| {
-                        unsafe {
-                            let core = webview.controller().CoreWebView2().ok();
-                            if let Some(core) = core {
-                                let mut token = Default::default();
-                                let handler = PermissionRequestedEventHandler::create(Box::new(
-                                    |_sender, args| {
-                                        if let Some(args) = args {
-                                            let _ = args.SetState(COREWEBVIEW2_PERMISSION_STATE_ALLOW);
-                                        }
-                                        Ok(())
-                                    },
-                                ));
-                                let _ = core.add_PermissionRequested(&handler, &mut token);
-                                // Intenta ICoreWebView2_13 (no todas las versiones lo tienen).
-                                let _ = core.cast::<ICoreWebView2_13>();
-                            }
+                    let _ = window.with_webview(|webview| unsafe {
+                        if let Ok(core) = webview.controller().CoreWebView2() {
+                            let mut token = Default::default();
+                            let handler = PermissionRequestedEventHandler::create(Box::new(
+                                |_sender, args| {
+                                    if let Some(args) = args {
+                                        let _ = args.SetState(COREWEBVIEW2_PERMISSION_STATE_ALLOW);
+                                    }
+                                    Ok(())
+                                },
+                            ));
+                            let _ = core.add_PermissionRequested(&handler, &mut token);
                         }
                     });
                 }

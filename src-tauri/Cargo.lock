@@ -141,7 +141,6 @@ dependencies = [
  "tauri-plugin-sql",
  "webkit2gtk",
  "webview2-com",
- "windows",
 ]
 
 [[package]]
