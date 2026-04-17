@@ -70,22 +70,32 @@ GitHub Actions
 ```
 
 ### First Name *
-**[YOUR FIRST NAME]**
+```
+Nicolás
+```
 
 ### Last Name *
-**[YOUR LAST NAME]**
+```
+Baier Quezada
+```
 
 ### Email *
-**[YOUR EMAIL]**
+```
+davil004@gmail.com
+```
 
 ### Company Name
-*(optional - leave empty or put your university/institution name)*
+*(leave empty)*
 
 ### Primary Discovery Channel *
-Typical options: "Search engine", "GitHub", "Recommendation", "Blog/article"
+```
+Recommendation
+```
 
 ### Please specify the exact source
-*(e.g. "Google search for code signing open source", "Recommended by another OSS project", "GitHub repository of a similar tool", etc.)*
+```
+Recommended while researching Windows code signing options for my open source Tauri project
+```
 
 ### Checkboxes
 - ☑ **Code of Conduct** — required
