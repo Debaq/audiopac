@@ -48,3 +48,4 @@ src-tauri/gen/schemas/
 # Sharvard corpus fuente (bajar de Zenodo 3547446, no commitear)
 /sharvard/
 
+.claude/
