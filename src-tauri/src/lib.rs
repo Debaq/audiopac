@@ -1,5 +1,35 @@
 mod migrations;
 
+use tauri::{AppHandle, Manager};
+
+/// Borra la base de datos y el directorio de estímulos, luego reinicia la app.
+/// Se invoca desde el modal de "Base de datos incompatible" en el frontend.
+#[tauri::command]
+fn reset_database(app: AppHandle) -> Result<(), String> {
+    let app_data = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("no app_data_dir: {e}"))?;
+
+    let db_path = app_data.join("audiopac.db");
+    if db_path.exists() {
+        std::fs::remove_file(&db_path).map_err(|e| format!("rm db: {e}"))?;
+    }
+    for ext in ["-shm", "-wal"] {
+        let sidecar = app_data.join(format!("audiopac.db{ext}"));
+        if sidecar.exists() {
+            let _ = std::fs::remove_file(&sidecar);
+        }
+    }
+
+    let stimuli = app_data.join("stimuli");
+    if stimuli.exists() {
+        let _ = std::fs::remove_dir_all(&stimuli);
+    }
+
+    app.restart();
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let migrations = migrations::get_migrations();
@@ -12,7 +42,10 @@ pub fn run() {
         )
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
-        .plugin(tauri_plugin_os::init());
+        .plugin(tauri_plugin_os::init())
+        .plugin(tauri_plugin_http::init())
+        .plugin(tauri_plugin_process::init())
+        .invoke_handler(tauri::generate_handler![reset_database]);
 
     if cfg!(debug_assertions) {
         builder = builder.plugin(
@@ -24,8 +57,6 @@ pub fn run() {
 
     builder
         .setup(|app| {
-            use tauri::Manager;
-
             #[cfg(target_os = "linux")]
             {
                 use webkit2gtk::{PermissionRequestExt, SettingsExt, WebViewExt};

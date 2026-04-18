@@ -152,7 +152,11 @@ Objetivo: que los dB reportados sean dB SPL reales, no pseudo-calibrados.
 ### Fase 4 — Procesamiento avanzado + pruebas PAC verbales
 - ✅ **Denoise espectral** (`src/lib/audio/denoise.ts`). STFT radix-2 (N=1024, hop 256, Hann), perfil de ruido por percentil 20 de magnitud por bin (robusto sin silencio inicial limpio), gate por bin (bin > `noise * thrMul` → pasa; sino atenúa `reductionDb` = −12 dB default), smoothing en frecuencia y tiempo (half-width 2 bins / 2 frames) contra musical noise, iSTFT con overlap-add y normalización por ∑win². Integrado en `processClip` tras HP y antes de VAD. Flag `denoise: true` default en `ProcessingOptions`
 - ✅ **Trim automático robusto (VAD)**. `recording.ts` — ventana 10 ms hop 5 ms, RMS+ZCR, piso de ruido adaptativo (percentil 10 de energías), umbral = `noise_floor + 12 dB` (piso absoluto −50 dBFS), asistencia ZCR para fricativas (umbral adaptativo por percentil 70 de ZCR), cierre morfológico (huecos <80 ms rellenados) y apertura (islas <30 ms descartadas), márgenes pre 30 ms / post 50 ms. Fallback al método RMS fijo si VAD no detecta voz. Seleccionable por `trimMethod: 'vad'|'rms'` en `ProcessingOptions` (default `vad`)
-- Biblioteca de listas estándar (PAL, PALPA, HINT-ES)
+- ✅ **Repo `audiopac-assets` + página `/catalogos`**. Repo GitHub público con manifiesto `index.json` + catálogos JSON (texto+keywords) + GitHub Releases para packs audio tar.gz. App (`src/lib/assets/catalogs.ts` + `CatalogsPage.tsx`): fetch manifiesto, valida SHA-256, instala texto runtime (crea listas+items en DB, idempotente), descarga tarballs audio (con progress stream), gunzip via `fflate`, parse tar POSIX manual, decodifica+procesa+guarda cada WAV. Sharvard v1 publicado: texto (`catalogs/sharvard-es-v1.json`, 211 KB) + audio F (130 MB) + audio M (135 MB) como release `sharvard-audio-v1`. Filosofía: contenido fuera del binario — catálogos nuevos sin rebuild; contribuciones comunitarias vía PR al repo assets. Menu lateral nuevo ítem "Catálogos".
+- ~~Importador pack Sharvard local~~ (reemplazado por `/catalogos` → repo remoto). Usuario descarga `sig.zip` de Zenodo, lo descomprime, elige carpeta `sig/F` o `sig/M`, y un único click importa los 700 WAV: busca `shd001..shd700.wav`, mapea a `SHARVARD_ES_L{ceil(n/10)}` posición `((n-1)%10)+1`, procesa con `processClip` (HP 80, trim VAD, norm −20 dBFS, denoise OFF porque audio ya pro), encodea WAV PCM 16-bit y escribe a `appDataDir/stimuli/`. Barra de progreso + lista de errores.
+- ✅ **Corpus Sharvard ES** (migración 017). 700 frases peninsular ES (Aubanel et al. 2014, Zenodo 3547446), 70 listas × 10, balanceadas fonémicamente, 5 keywords por frase. Script `scripts/build-sharvard-migration.mjs` parsea `sharvard/lists-phonemic-SAMPA.txt` (formato `code|ortho_uppercase_keys|SAMPA`) — extrae keywords por detección de palabras en mayúsculas, normaliza texto final, emite SQL. Plantilla `HINT_SHARVARD_L01` seed (usuario puede clonar para usar otra lista). Audios Sharvard (265 MB `sig.zip`) NO se empaquetan — usuario descarga pack aparte o graba propios.
+- ✅ **HINT-ES adaptativo en ruido** (migraciones 015 + 016). Schema `stimuli.keywords_json` (array palabras clave) + `metadata_json`. `HINTController` (`src/lib/audio/hintRunner.ts`) adapta SNR por bracketing: cada trial es una frase, pasa si ≥`threshold_pass_ratio` de keywords correctos; desciende SNR tras pasar, sube tras fallar. Engine: `playStimulusWithNoise(buffer, voice_db, noise_db, type)` mezcla voz + ruido rosa/blanco con lead-in/out 200 ms. UI `/estimulos` permite marcar keywords por frase clickeando palabras en listas `category=sentence`. Componente `HINTRun.tsx` muestra frase con chips clickables (solo keywords marcables), controles "todas ok" / "ninguna". Plantilla `HINT_ES_CUSTOM` apunta a `HINT_ES_CUSTOM_A` (lista vacía, usuario graba). ⚠️ Pendiente: bundle Sharvard 700 frases (repo `audiopac-assets` aparte, aún no creado). Calibración ruido: usa aproximación `rms_dbfs` por tipo (−15 pink, −5 white). Para clínica estricta, calibrar ruido por separado.
+- Biblioteca de listas estándar (PAL, PALPA)
 - ✅ **Dichotic Digits ES** (migración 014). Plantillas `DD_ES_FREE` (recuerdo libre) y `DD_ES_DIRECTED` (recuerdo dirigido alternando oído inicial). Usa `playStimulusPair` en `engine.ts` para disparar dos `AudioBuffer` simultáneos con mismo `startTime` (uno por oído). Lista `DICHOTIC_DIGITS_ES` (mig 012) con dígitos 1–9 excluyendo "siete". Scoring por oído con asimetría (R − L). Pares configurables (default 20 pares · 2 dígitos/oído · 55 dB HL).
 - SSW adaptado, SinB-ES (pendiente)
 
@@ -165,6 +169,133 @@ Objetivo: que los dB reportados sean dB SPL reales, no pseudo-calibrados.
 - ✅ Mezcla simultánea tono + ruido vía `ToneDefinition.noise_mix` (rama paralela en `playSequence`, misma envolvente de duración)
 - ✅ **MLD (Masking Level Difference)** (`MLD_STD`, mig 008). Inversión de fase R vía `phase_invert_right` (gain -1 en `rightNode` del tono; ruido nunca invertido). Tokens A=SoNo+tono, B=SoNo catch, C=SπNo+tono (−10 dB), D=SπNo catch
 - ⚠️ Calibración SPL: `ref_db` actual fue medido con tono puro. El ruido blanco/rosa a la misma amplitud digital da ~3–5 dB SPL más que un tono puro. Para clínica estricta, calibrar ruido por separado.
+
+---
+
+### Fase 6 — Sistema de paquetes (arquitectura extensible) 🚧 en curso
+
+**Hecho (6.1–6.4 parcial):**
+- ✅ Schema colapsado: migraciones 002–018 fusionadas en `001_initial.sql`. App arranca con schema único v2 (settings.schema_era='v2-packs') sin seeds. Tabla `packs` + FK `pack_id` en `test_templates`/`stimulus_lists` (ON DELETE SET NULL para preservar sesiones).
+- ✅ Detección DB pre-v2: al boot, `checkSchemaEra()` (`src/lib/db/client.ts`) verifica `settings.schema_era`. Falla por checksum mismatch o ausencia → modal `<SchemaIncompatibleDialog>` bloqueante con dos botones: **Salir** (cierra ventana, vuelve a aparecer al reabrir) y **Aceptar y regenerar** (invoca comando Tauri `reset_database` → borra `audiopac.db`+sidecars+carpeta `stimuli` → `app.restart()`).
+- ✅ Plugin `tauri-plugin-process` agregado para reinicio. Permiso `process:allow-restart`.
+- ✅ Tipos canónicos en `src/lib/packs/types.ts` (PackManifest, PackTest, PackStimulusList, PackInterpretation).
+- ✅ Installer `src/lib/packs/installer.ts`: `fetchPacksIndex`/`fetchPackManifest` (fetch + verificación SHA-256), `installPack` idempotente (upsert por code, preserva `file_path`/audios grabados), `uninstallPack` (bloquea si hay sesiones referenciando).
+- ✅ Repo `audiopac-assets` extendido: 11 packs publicados en `packs/*.json` + `index.json` con clave `packs` (id/version/name/category/requirements/license/url/sha256/bytes).
+- ✅ UI `/catalogos` extendida con sección **Paquetes de pruebas** (`<PacksSection>`): grid con install/reinstalar/desinstalar, badges versión + requirements (ninguno/recording/audio_pack), detección de updates por diff de versión.
+
+**Packs publicados:**
+
+| Pack | Tests | Listas | Requirements |
+|---|---|---|---|
+| `pac-patterns-v1` | FPT_STD, PPS_LONG, DPT_LONG, MEM_SEQ_5/6/7 | — | ninguno |
+| `pac-limens-v1` | DLF_SCREEN/FINE, DLD_SCREEN/FINE, DLI_SCREEN/FINE | — | ninguno |
+| `pac-temporal-v1` | GAP_20/10/5, TOJ_BIN/FAST, FGC_SCREEN | — | ninguno |
+| `pac-binaural-v1` | ILD_LAT, DICHOTIC_NV, FUSION_BIN | — | ninguno |
+| `pac-noise-v1` | GIN_STD, RGD_20/10/5, NBN_SCREEN | — | ninguno |
+| `pac-mld-v1` | MLD_STD | — | ninguno |
+| `logoaud-latam-v1` | SRT_LATAM_BISIL | SRT_LATAM_BISIL_A (20), DISC_LATAM_MONO_A (25) | recording |
+| `logoaud-us-es-v1` | SRT_US_ES_BISIL | SRT_US_ES_BISIL_A (20) | recording |
+| `dichotic-digits-es-v1` | DD_ES_FREE, DD_ES_DIRECTED | DICHOTIC_DIGITS_ES (8 dígitos) | recording |
+| `hint-es-v1` | HINT_ES_CUSTOM | HINT_ES_CUSTOM_A (vacía) | recording |
+| `sharvard-es-v1` | HINT_SHARVARD_L01 | (referencia a `catalogs/sharvard-es-v1.json`, 70 listas × 10) | audio_pack |
+
+**Pendiente:**
+
+- 6.5 Bootstrap primer arranque: modal "¿Instalar packs recomendados?" con checkboxes pre-marcados (pac-patterns, pac-limens, pac-temporal).
+- 6.6 Ficha rica del pack (markdown render de `description_md`, lista de tests/listas dentro, referencias bibliográficas, normas clínicas).
+- 6.7 Interpretación dinámica en `SessionReportPage`: leer `pack.interpretation.norms_by_age` → semáforo automático.
+- 6.8 PPS_STD (Pinheiro 880/1430, mig 002) y DPS_STD (Musiek, 60 secuencias, mig 002) NO se incluyeron en pac-patterns-v1 — agregar en pac-patterns-v2 si se quiere mantener compatibilidad histórica.
+- 6.9 Plantillas de reporte custom por pack (markdown con placeholders).
+
+#### 6.X (propuesta original — para referencia)
+
+Refactor filosófico: la app arranca **vacía** (solo motor, grabador, calibración). Tests, listas y audios vienen como **paquetes instalables/desinstalables** desde `audiopac-assets`. Migraciones = solo schema de BD; contenido = runtime.
+
+#### 6.1 Visión
+
+App = motor audio + engine de pruebas. No viene con tests pre-cargados. Usuario puede:
+- Crear sus propios tests desde `/tests/nuevo` (capacidad ya existe)
+- Ir a `/catalogos` → instalar packs oficiales/comunitarios → tests aparecen en `/tests`
+- Desinstalar packs que no usa → tests desaparecen (con protección si hay sesiones que los referencian)
+
+#### 6.2 Formato paquete
+
+Cada pack es un JSON autocontenido (en repo assets) con:
+
+```jsonc
+{
+  "id": "dlf-adults-v1",
+  "version": "1.0.0",
+  "name": "Diferencia Limen de Frecuencia (adultos)",
+  "category": "pac.temporal",
+  "description_md": "# DLF\n\nEvalúa discriminación fina de frecuencia…",
+  "requirements": "ninguno",        // ninguno | recording | audio_pack
+  "license": "CC-BY",
+  "author": { "name": "…", "url": "…" },
+  "references": [
+    { "citation": "Moore 1973 J Acoust Soc Am", "url": "…" }
+  ],
+  "tests": [
+    { "code": "DLF_SCREEN", "name": "DLF screening",   "config": { … } },
+    { "code": "DLF_FINE",   "name": "DLF fino",        "config": { … } }
+  ],
+  "lists": [],                       // vacío si no requiere estímulos grabados
+  "audio_packs": [],                 // release tarballs si aplica
+  "interpretation": {
+    "metric": "threshold_hz",
+    "norms_by_age": [
+      { "age_min": 18, "age_max": 60, "normal_max": 3, "mild_max": 6, "severe_min": 10 }
+    ],
+    "description_md": "Umbrales >6 Hz sugieren compromiso temporal…"
+  },
+  "report_template": "dlf-report.md"  // opcional: sección dinámica del informe
+}
+```
+
+#### 6.3 Schema BD nuevo (mig chica, no breaking)
+
+- `packs` (`id`, `code UNIQUE`, `version`, `name`, `metadata_json`, `installed_at`, `source_url`)
+- `test_templates.pack_id` FK nullable → `packs(id)` ON DELETE SET NULL
+- `stimulus_lists.pack_id` FK nullable idem
+
+Tests/lists con `pack_id = NULL` = creados por el usuario, intocables al desinstalar packs.
+
+#### 6.4 Ficha UI por pack en `/catalogos`
+
+| Estado requirement | Icono + mensaje |
+|---|---|
+| `ninguno` (tonos puros) | ✓ "Listo para usar tras instalar" |
+| `recording` | 🎤 "Requiere grabar N palabras/frases en `/estimulos`" |
+| `audio_pack` | 📦 "Incluye audios" o bien "⚠ Audios por copyright — grabá los tuyos" |
+
+Ficha muestra: descripción, licencia, referencias, cantidad de tests/listas, tamaño audio (si aplica), botones Instalar/Desinstalar/Actualizar.
+
+#### 6.5 Plan por fases
+
+1. **6.1** Mig BD nueva: `packs` + FK en `test_templates`/`stimulus_lists`
+2. **6.2** Schema JSON pack definido + publicar pack ejemplo (`packs/pac-tonal-core-v1.json`)
+3. **6.3** Installer/uninstaller runtime (fetch pack JSON, INSERT tests+lists con pack_id; DELETE bloqueado si hay sesiones referenciando)
+4. **6.4** UI `/catalogos` extendida con fichas ricas (markdown render, badges requirements, desinstalar)
+5. **6.5** Empaquetar los seeds actuales en packs: desagregar migraciones 002/004/005/006/007/008/009/013/014/016/017 en JSONs del repo assets
+6. **6.6** Remover INSERTs de esas migraciones (solo dejan schema). App arranca vacía
+7. **6.7** Bootstrap primer arranque: modal "¿Instalar packs recomendados?" (tonal core, ruido core, Sharvard texto) — opt-in
+8. **6.8** Interpretación dinámica en `SessionReportPage`: leer `pack.interpretation.norms_by_age` → semáforo automático + referencias en footer
+9. **6.9** Plantillas de reporte custom por pack (markdown con placeholders tipo `{{srt_db}}`, `{{asimetría}}`)
+
+#### 6.6 Paquetes pendientes de crear (cuando el sistema esté listo)
+
+- **Matrix-ES** (Hochmuth 2012) — estructura matriz pública (10×5=50 palabras) + runner 5-AFC. Audios cerrados (HörTech) → solo estructura + descripción + flag `requirements: recording`
+- **SSW adaptado** (pendiente diseño)
+- **SinB-ES** (pendiente diseño)
+- **PAL / PALPA** (texto LatAm)
+- **HINT-ES clínico** (ya existe texto + audios Sharvard, solo falta reempaquetar como pack v2)
+
+#### 6.7 Riesgos y mitigaciones
+
+- **Sesiones huérfanas al desinstalar**: FK `ON DELETE SET NULL` + UI bloquea desinstalar si hay `test_sessions.template_id` apuntando (ofrece "archivar pack" en lugar de borrar)
+- **Offline bootstrap**: primer arranque sin red → app funcional pero vacía; cachear último `index.json` para mostrar "ya conocés estos packs aunque no podés instalarlos ahora"
+- **Versiones y updates**: diff versión vs instalado → botón "Actualizar" re-INSERT preservando custom de usuario
+- **Conflicto codes**: dos packs que quieren el mismo `code` de test → rechaza segundo install con error claro
 
 ---
 

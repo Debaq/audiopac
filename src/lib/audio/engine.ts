@@ -484,6 +484,79 @@ export async function playStimulusBuffer(
 }
 
 /**
+ * Reproduce un estímulo con ruido enmascarante simultáneo (HINT / SinB).
+ * - Voz: buffer al `level_db` SPL (usa rms_dbfs para mapeo, igual que playStimulusBuffer)
+ * - Ruido: loop del buffer blanco/rosa al `noise_level_db` SPL, arranca 200 ms antes y
+ *   termina 200 ms después con fade 50 ms para evitar clicks y enmascarar desde el primer fonema.
+ * onEnd dispara al terminar la voz.
+ */
+export async function playStimulusWithNoise(
+  buffer: AudioBuffer,
+  level_db: number,
+  noise_level_db: number,
+  noise_type: NoiseType = 'pink',
+  opts: { ear?: Ear; rms_dbfs?: number | null; refDb?: number; onEnd?: () => void } = {}
+): Promise<() => void> {
+  const ctx = await ensureRunning()
+  const ear = opts.ear ?? 'binaural'
+  const rms = opts.rms_dbfs ?? -20
+  const ref = opts.refDb ?? resolveRefDb(1000, ear)
+  const voiceGain = dbToGain(level_db - rms, ref)
+  // Ruido: el buffer blanco/rosa tiene RMS ≈ -3 dBFS (white) / variable (pink); aprox -15 dBFS pink tras escalado.
+  // Usamos el gain de mapeo SPL directo asumiendo que el ruido está cerca 0 dBFS. Para calibración estricta, medir.
+  const noiseRmsDbfs = noise_type === 'pink' ? -15 : -5
+  const noiseGain = dbToGain(noise_level_db - noiseRmsDbfs, ref)
+
+  const merger = ctx.createChannelMerger(2)
+  const { l, r } = earGains(ear)
+
+  // Voz
+  const srcV = ctx.createBufferSource()
+  srcV.buffer = buffer
+  const gV = ctx.createGain()
+  gV.gain.value = voiceGain
+  const vL = ctx.createGain(); vL.gain.value = l
+  const vR = ctx.createGain(); vR.gain.value = r
+  srcV.connect(gV); gV.connect(vL); gV.connect(vR)
+  vL.connect(merger, 0, 0); vR.connect(merger, 0, 1)
+
+  // Ruido
+  const noiseBuf = noise_type === 'pink' ? getPinkNoiseBuffer(ctx) : getWhiteNoiseBuffer(ctx)
+  const srcN = ctx.createBufferSource()
+  srcN.buffer = noiseBuf
+  srcN.loop = true
+  const gN = ctx.createGain()
+  const nL = ctx.createGain(); nL.gain.value = l
+  const nR = ctx.createGain(); nR.gain.value = r
+  srcN.connect(gN); gN.connect(nL); gN.connect(nR)
+  nL.connect(merger, 0, 0); nR.connect(merger, 0, 1)
+  merger.connect(ctx.destination)
+
+  const t0 = ctx.currentTime + 0.05
+  const leadIn = 0.2
+  const fade = 0.05
+  const tNoiseStart = t0
+  const tVoiceStart = t0 + leadIn
+  const tVoiceEnd = tVoiceStart + buffer.duration
+  const tNoiseEnd = tVoiceEnd + leadIn
+
+  gN.gain.setValueAtTime(0, tNoiseStart)
+  gN.gain.linearRampToValueAtTime(noiseGain, tNoiseStart + fade)
+  gN.gain.setValueAtTime(noiseGain, tNoiseEnd - fade)
+  gN.gain.linearRampToValueAtTime(0, tNoiseEnd)
+
+  srcN.start(tNoiseStart)
+  srcN.stop(tNoiseEnd + 0.02)
+  srcV.start(tVoiceStart)
+  srcV.onended = () => opts.onEnd?.()
+
+  return () => {
+    try { srcV.stop() } catch {}
+    try { srcN.stop() } catch {}
+  }
+}
+
+/**
  * Reproduce dos AudioBuffer simultáneos, uno por oído, sincronizados (mismo startTime).
  * Pensado para Dichotic Digits: digitoL al L y digitoR al R. Cada uno con su propio
  * rms_dbfs y al mismo level_db SPL por oído. Llama onEnd cuando el MÁS LARGO termina.

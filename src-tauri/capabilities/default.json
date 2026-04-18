@@ -31,6 +31,18 @@
     "fs:allow-app-write-recursive",
     "fs:allow-app-read-recursive",
     "fs:allow-app-meta-recursive",
-    "os:default"
+    "os:default",
+    "process:default",
+    "process:allow-restart",
+    {
+      "identifier": "http:default",
+      "allow": [
+        { "url": "https://raw.githubusercontent.com/" },
+        { "url": "https://github.com/" },
+        { "url": "https://objects.githubusercontent.com/" },
+        { "url": "https://release-assets.githubusercontent.com/" },
+        { "url": "https://codeload.github.com/" }
+      ]
+    }
   ]
 }

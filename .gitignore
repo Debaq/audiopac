@@ -44,3 +44,7 @@ src-tauri/gen/schemas/
 *.key
 *.pem
 !src-tauri/icons/**/*.icns
+
+# Sharvard corpus fuente (bajar de Zenodo 3547446, no commitear)
+/sharvard/
+

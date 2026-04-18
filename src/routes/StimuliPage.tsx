@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import {
   listStimulusLists, listStimuli, createStimulusList, deleteStimulusList,
   addStimulusToken, updateStimulusRecording, clearStimulusRecording, deleteStimulus,
+  updateStimulusKeywords, parseKeywords,
 } from '@/lib/db/stimuli'
 import { saveStimulusWav, removeStimulusFile, loadStimulusWav } from '@/lib/fs/stimuli'
 import {
@@ -18,6 +19,14 @@ import { playStimulusBuffer, loadStimulusBuffer } from '@/lib/audio/engine'
 import { useSettingsStore, COUNTRY_OPTIONS } from '@/stores/settings'
 import { useAuth } from '@/stores/auth'
 import type { StimulusList, Stimulus, StimulusCategory } from '@/types'
+
+function normalizeWord(w: string): string {
+  return w.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '').replace(/[^\p{L}\p{N}]+/gu, '')
+}
+
+function tokenizeSentence(s: string): string[] {
+  return s.split(/\s+/).filter(Boolean)
+}
 
 const CATEGORIES: { value: StimulusCategory; label: string }[] = [
   { value: 'srt', label: 'SRT (bisílabos)' },
@@ -201,6 +210,15 @@ export function StimuliPage() {
     }
   }
 
+  const toggleKeyword = async (s: Stimulus, word: string) => {
+    const norm = normalizeWord(word)
+    const current = parseKeywords(s)
+    const has = current.includes(norm)
+    const next = has ? current.filter(w => w !== norm) : [...current, norm]
+    await updateStimulusKeywords(s.id, next)
+    await refreshItems()
+  }
+
   const clearRec = async (s: Stimulus) => {
     if (!confirm(`¿Borrar grabación de "${s.token}"?`)) return
     if (s.file_path) await removeStimulusFile(s.file_path).catch(() => {})
@@ -324,11 +342,15 @@ export function StimuliPage() {
                         const isRec = recordingId === s.id
                         const isBusy = busyId === s.id
                         const isPlaying = playingId === s.id
+                        const isSentence = selectedList.category === 'sentence'
+                        const words = isSentence ? tokenizeSentence(s.token) : []
+                        const keys = isSentence ? parseKeywords(s) : []
                         return (
                           <div
                             key={s.id}
-                            className={`flex items-center gap-2 p-2 rounded-md border ${s.file_path ? 'border-emerald-500/40 bg-emerald-500/5' : 'border-[var(--border)]/50'}`}
+                            className={`rounded-md border ${s.file_path ? 'border-emerald-500/40 bg-emerald-500/5' : 'border-[var(--border)]/50'}`}
                           >
+                          <div className="flex items-center gap-2 p-2">
                             <span className="w-8 text-xs text-[var(--muted-foreground)] text-right">{s.position}</span>
                             <span className="font-medium flex-1">{s.token}</span>
 
@@ -374,6 +396,30 @@ export function StimuliPage() {
                             <Button size="sm" variant="ghost" onClick={() => removeToken(s)} disabled={isBusy || isRec} title="Eliminar token">
                               ×
                             </Button>
+                          </div>
+                          {isSentence && words.length > 0 && (
+                            <div className="px-2 pb-2 pt-1 border-t border-[var(--border)]/30 flex flex-wrap gap-1">
+                              <span className="text-[10px] text-[var(--muted-foreground)] mr-1 self-center">
+                                Palabras clave ({keys.length}):
+                              </span>
+                              {words.map((w, i) => {
+                                const n = normalizeWord(w)
+                                const isKey = !!n && keys.includes(n)
+                                return (
+                                  <button
+                                    key={i}
+                                    onClick={() => n && toggleKeyword(s, w)}
+                                    disabled={!n || isBusy || isRec}
+                                    className={`text-xs px-1.5 py-0.5 rounded border transition-colors ${isKey
+                                      ? 'border-[var(--primary)] bg-[var(--primary)]/15 text-[var(--primary)] font-medium'
+                                      : 'border-[var(--border)]/50 hover:bg-[var(--secondary)]'}`}
+                                  >
+                                    {w}
+                                  </button>
+                                )
+                              })}
+                            </div>
+                          )}
                           </div>
                         )
                       })}

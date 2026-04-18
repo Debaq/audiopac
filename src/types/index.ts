@@ -94,6 +94,7 @@ export interface TestConfig {
   level_db: number
   srt?: SRTParams
   dichotic_digits?: DichoticDigitsParams
+  hint?: HINTParams
 }
 
 export interface TestTemplate {
@@ -191,8 +192,30 @@ export interface Stimulus {
   peak_dbfs: number | null
   sample_rate: number | null
   normalized: number
+  keywords_json: string | null
+  metadata_json: string | null
   created_at: string
   updated_at: string
+}
+
+export interface HINTParams {
+  stimulus_list_code: string
+  /** SNR inicial en dB (voz − ruido). Típico +5 a +10 dB. */
+  start_snr_db: number
+  /** Nivel ruido fijo en dB SPL. Voz = noise + snr. */
+  noise_level_db: number
+  /** Tipo de ruido enmascarante. 'pink' por defecto (aproximación habla). */
+  noise_type: NoiseType
+  /** Frases por nivel de SNR antes de decidir paso. */
+  sentences_per_level: number
+  /** Ratio de keywords correctos para pasar ≥ threshold. */
+  threshold_pass_ratio: number
+  /** Pasos SNR. */
+  step_down_db: number
+  step_up_db: number
+  min_snr_db: number
+  max_snr_db: number
+  max_total_trials?: number
 }
 
 export interface Calibration {

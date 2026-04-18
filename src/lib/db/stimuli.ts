@@ -108,6 +108,25 @@ export async function clearStimulusRecording(id: number): Promise<void> {
   )
 }
 
+export async function updateStimulusKeywords(id: number, keywords: string[] | null): Promise<void> {
+  const db = await getDb()
+  const json = keywords && keywords.length > 0 ? JSON.stringify(keywords) : null
+  await db.execute(
+    `UPDATE stimuli SET keywords_json=$1, updated_at=datetime('now') WHERE id=$2`,
+    [json, id]
+  )
+}
+
+export function parseKeywords(s: Stimulus): string[] {
+  if (!s.keywords_json) return []
+  try {
+    const v = JSON.parse(s.keywords_json)
+    return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []
+  } catch {
+    return []
+  }
+}
+
 export async function deleteStimulus(id: number): Promise<void> {
   const db = await getDb()
   await db.execute('DELETE FROM stimuli WHERE id = $1', [id])
