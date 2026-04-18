@@ -7,20 +7,26 @@ import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
-import { playCalibrationTone, ensureRunning } from '@/lib/audio/engine'
+import { playCalibrationTone, playCalibrationNoise, ensureRunning } from '@/lib/audio/engine'
 import {
   createCalibration, listCalibrations, setActiveCalibration, deleteCalibration, getActiveCalibration,
   isCalibrationExpired, upsertPoint, listPoints, deletePoint,
+  upsertNoisePoint, listNoisePoints, deleteNoisePoint,
 } from '@/lib/db/calibrations'
 import { listAudioOutputs, requestDeviceLabelPermission, type AudioOutputDevice } from '@/lib/audio/device'
 import { useCalibrationStore } from '@/stores/calibration'
 import { useAuth } from '@/stores/auth'
-import type { Calibration, CalibrationPoint, Ear } from '@/types'
+import type { Calibration, CalibrationPoint, Ear, NoiseCalibrationPoint, NoiseCalibType } from '@/types'
 import { formatDateTime } from '@/lib/utils'
 
 const DEFAULT_DBFS = -20
 const STD_FREQS = [250, 500, 1000, 2000, 4000, 8000]
 const EARS: Ear[] = ['left', 'right']
+const NOISE_TYPES: { code: NoiseCalibType; label: string; hint: string }[] = [
+  { code: 'pink', label: 'Rosa', hint: 'HINT, SinB voz+ruido genérico' },
+  { code: 'white', label: 'Blanco', hint: 'GIN, NBN, MLD' },
+  { code: 'ssn', label: 'SSN', hint: 'SinB-ES (rosa LP 1 kHz)' },
+]
 
 export function CalibrationPage() {
   const profile = useAuth(s => s.activeProfile)
@@ -28,6 +34,7 @@ export function CalibrationPage() {
 
   const [list, setList] = useState<Calibration[]>([])
   const [pointsByCal, setPointsByCal] = useState<Record<number, CalibrationPoint[]>>({})
+  const [noisePointsByCal, setNoisePointsByCal] = useState<Record<number, NoiseCalibrationPoint[]>>({})
   const [devices, setDevices] = useState<AudioOutputDevice[]>([])
   const [deviceId, setDeviceId] = useState<string>('')
   const [needsPermission, setNeedsPermission] = useState(false)
@@ -45,13 +52,25 @@ export function CalibrationPage() {
 
   const activeCal = useMemo(() => list.find(c => c.is_active === 1) ?? null, [list])
   const activePoints = activeCal ? (pointsByCal[activeCal.id] ?? []) : []
+  const activeNoisePoints = activeCal ? (noisePointsByCal[activeCal.id] ?? []) : []
+
+  const [noiseType, setNoiseType] = useState<NoiseCalibType>('pink')
+  const [noiseDbfs, setNoiseDbfs] = useState<number>(DEFAULT_DBFS)
+  const [noiseMeasured, setNoiseMeasured] = useState<string>('')
+  const [isNoisePlaying, setIsNoisePlaying] = useState(false)
+  const noiseStopRef = useRef<(() => void) | null>(null)
 
   const refreshAll = async () => {
     const cals = await listCalibrations()
     setList(cals)
     const pointsMap: Record<number, CalibrationPoint[]> = {}
-    await Promise.all(cals.map(async c => { pointsMap[c.id] = await listPoints(c.id) }))
+    const noiseMap: Record<number, NoiseCalibrationPoint[]> = {}
+    await Promise.all(cals.map(async c => {
+      pointsMap[c.id] = await listPoints(c.id)
+      noiseMap[c.id] = await listNoisePoints(c.id)
+    }))
     setPointsByCal(pointsMap)
+    setNoisePointsByCal(noiseMap)
     refreshStore()
   }
 
@@ -71,9 +90,48 @@ export function CalibrationPage() {
     navigator.mediaDevices?.addEventListener?.('devicechange', h)
     return () => {
       stopRef.current?.()
+      noiseStopRef.current?.()
       navigator.mediaDevices?.removeEventListener?.('devicechange', h)
     }
   }, [])
+
+  const toggleNoisePlay = async () => {
+    if (isNoisePlaying) {
+      noiseStopRef.current?.()
+      noiseStopRef.current = null
+      setIsNoisePlaying(false)
+      return
+    }
+    await ensureRunning()
+    const stop = await playCalibrationNoise(noiseType, noiseDbfs, 'binaural')
+    noiseStopRef.current = stop
+    setIsNoisePlaying(true)
+  }
+
+  const saveNoisePoint = async () => {
+    if (!activeCal) { alert('Activá una calibración primero'); return }
+    const m = Number(noiseMeasured)
+    if (!Number.isFinite(m)) { alert('Ingresá el dB SPL medido'); return }
+    const refDb = m - noiseDbfs
+    await upsertNoisePoint({
+      calibration_id: activeCal.id,
+      noise_type: noiseType,
+      internal_level_dbfs: noiseDbfs,
+      measured_db_spl: m,
+      ref_db_spl: refDb,
+    })
+    setNoiseMeasured('')
+    refreshAll()
+  }
+
+  const removeNoisePoint = async (id: number) => {
+    await deleteNoisePoint(id)
+    refreshAll()
+  }
+
+  const noisePreview = Number(noiseMeasured) - noiseDbfs
+  const noisePreviewOk = Number.isFinite(Number(noiseMeasured))
+  const noisePointFor = (t: NoiseCalibType) => activeNoisePoints.find(p => p.noise_type === t)
 
   const grantPermission = async () => {
     await requestDeviceLabelPermission()
@@ -330,6 +388,111 @@ export function CalibrationPage() {
               </table>
               <p className="text-xs text-[var(--muted-foreground)] mt-2">
                 {activePoints.length} / 12 puntos. Frecuencias no medidas se interpolan log-freq desde las más cercanas.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {activeCal && (
+        <Card className="mb-4">
+          <CardHeader>
+            <CardTitle>4. Calibración de ruido — {activeCal.label}</CardTitle>
+            <CardDescription>
+              SPL real del ruido enmascarante (HINT, SinB, GIN, MLD). Reproducí cada tipo,
+              medí con sonómetro al mismo nivel interno y guardá. Sin esto, el motor estima
+              ±3–5 dB usando RMS aproximado del buffer.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <Label>Tipo de ruido</Label>
+              <div className="flex flex-wrap gap-1.5 mt-1">
+                {NOISE_TYPES.map(nt => (
+                  <Button
+                    key={nt.code}
+                    size="sm"
+                    variant={noiseType === nt.code ? 'default' : 'outline'}
+                    onClick={() => setNoiseType(nt.code)}
+                    title={nt.hint}
+                  >
+                    {nt.label}
+                  </Button>
+                ))}
+              </div>
+              <p className="text-xs text-[var(--muted-foreground)] mt-1">
+                {NOISE_TYPES.find(n => n.code === noiseType)?.hint}
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Nivel interno (dBFS)</Label>
+                <Input type="number" step="1" value={noiseDbfs} onChange={e => setNoiseDbfs(Number(e.target.value))} />
+              </div>
+              <div>
+                <Label>dB SPL medido</Label>
+                <Input type="number" step="0.1" value={noiseMeasured} placeholder="ej. 70" onChange={e => setNoiseMeasured(e.target.value)} />
+              </div>
+            </div>
+
+            <div className="flex gap-2 items-center">
+              <Button onClick={toggleNoisePlay} variant={isNoisePlaying ? 'destructive' : 'default'}>
+                {isNoisePlaying ? <><Square className="w-4 h-4 mr-1.5" />Detener</> : <><Play className="w-4 h-4 mr-1.5" />Reproducir loop</>}
+              </Button>
+              <Button onClick={saveNoisePoint} disabled={!noisePreviewOk} variant="secondary">
+                <Check className="w-4 h-4 mr-1.5" />Guardar
+              </Button>
+              {noisePreviewOk && (
+                <span className="text-xs text-[var(--muted-foreground)]">
+                  → Ref <strong>{noisePreview.toFixed(1)} dB SPL @ 0 dBFS</strong>
+                </span>
+              )}
+            </div>
+
+            <div className="pt-2">
+              <Label>Puntos por tipo</Label>
+              <table className="w-full text-xs mt-2 border-collapse">
+                <thead>
+                  <tr>
+                    <th className="text-left p-1.5 border-b border-[var(--border)]">Tipo</th>
+                    <th className="p-1.5 border-b border-[var(--border)] text-center">Ref (dB SPL @ 0 dBFS)</th>
+                    <th className="p-1.5 border-b border-[var(--border)] text-center">Medido</th>
+                    <th className="p-1.5 border-b border-[var(--border)] text-center">Interno (dBFS)</th>
+                    <th className="p-1.5 border-b border-[var(--border)] text-center"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {NOISE_TYPES.map(nt => {
+                    const pt = noisePointFor(nt.code)
+                    const isSel = noiseType === nt.code
+                    return (
+                      <tr key={nt.code} className={isSel ? 'bg-[var(--primary)]/10' : ''}>
+                        <td className="p-1.5 border-b border-[var(--border)]/40 cursor-pointer font-medium" onClick={() => setNoiseType(nt.code)}>
+                          {nt.label}
+                        </td>
+                        <td className={`p-1.5 border-b border-[var(--border)]/40 text-center ${pt ? 'text-emerald-600 font-semibold' : 'text-[var(--muted-foreground)]'}`}>
+                          {pt ? pt.ref_db_spl.toFixed(1) : '—'}
+                        </td>
+                        <td className="p-1.5 border-b border-[var(--border)]/40 text-center">
+                          {pt ? pt.measured_db_spl.toFixed(1) : '—'}
+                        </td>
+                        <td className="p-1.5 border-b border-[var(--border)]/40 text-center">
+                          {pt ? pt.internal_level_dbfs.toFixed(0) : '—'}
+                        </td>
+                        <td className="p-1.5 border-b border-[var(--border)]/40 text-center">
+                          {pt && (
+                            <button className="text-red-500 hover:underline" onClick={() => removeNoisePoint(pt.id)}>×</button>
+                          )}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+              <p className="text-xs text-[var(--muted-foreground)] mt-2">
+                {activeNoisePoints.length} / {NOISE_TYPES.length} tipos calibrados.
+                Sin calibración por tipo, el motor usa heurístico (pink≈ref−15, white≈ref−5, ssn≈ref−20 dB).
               </p>
             </div>
           </CardContent>

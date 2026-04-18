@@ -148,6 +148,18 @@ export interface CalibrationPoint {
   created_at: string
 }
 
+export type NoiseCalibType = 'white' | 'pink' | 'ssn'
+
+export interface NoiseCalibrationPoint {
+  id: number
+  calibration_id: number
+  noise_type: NoiseCalibType
+  internal_level_dbfs: number
+  measured_db_spl: number
+  ref_db_spl: number
+  created_at: string
+}
+
 export interface TestResponse {
   id: number
   session_id: number

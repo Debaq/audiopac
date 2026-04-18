@@ -1,8 +1,8 @@
 import { create } from 'zustand'
 import type { Calibration } from '@/types'
-import { getActiveCalibration, getActiveCurve, isCalibrationExpired } from '@/lib/db/calibrations'
+import { getActiveCalibration, getActiveCurve, getActiveNoisePoints, isCalibrationExpired } from '@/lib/db/calibrations'
 import { getDefaultOutput } from '@/lib/audio/device'
-import { setActiveRefDb, setActiveCalibrationCurve, DEFAULT_REF_DB } from '@/lib/audio/engine'
+import { setActiveRefDb, setActiveCalibrationCurve, setActiveNoiseRef, DEFAULT_REF_DB, type NoiseRefByType } from '@/lib/audio/engine'
 
 export type CalibrationStatus = 'none' | 'ok' | 'expired' | 'device_mismatch'
 
@@ -41,8 +41,12 @@ export const useCalibrationStore = create<CalibrationState>((set, get) => ({
     const active = await getActiveCalibration().catch(() => null)
     const dev = await getDefaultOutput().catch(() => null)
     const curve = await getActiveCurve().catch(() => [])
+    const noisePts = await getActiveNoisePoints().catch(() => [])
     setActiveRefDb(active?.ref_db_spl ?? DEFAULT_REF_DB)
     setActiveCalibrationCurve(curve.map(p => ({ frequency_hz: p.frequency_hz, ear: p.ear, ref_db_spl: p.ref_db_spl })))
+    const noiseRef: NoiseRefByType = {}
+    for (const p of noisePts) noiseRef[p.noise_type] = p.ref_db_spl
+    setActiveNoiseRef(noiseRef)
     set({
       active,
       currentDeviceId: dev?.deviceId ?? null,

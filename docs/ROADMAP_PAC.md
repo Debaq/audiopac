@@ -170,7 +170,7 @@ Objetivo: que los dB reportados sean dB SPL reales, no pseudo-calibrados.
 - ✅ Plantillas nuevas: `GIN_STD` (gaps 2–20 ms en 3 s de ruido), `RGD_20/10/5` (Random Gap Detection con bursts de ruido), `NBN_SCREEN` (ruido banda angosta 1 kHz)
 - ✅ Mezcla simultánea tono + ruido vía `ToneDefinition.noise_mix` (rama paralela en `playSequence`, misma envolvente de duración)
 - ✅ **MLD (Masking Level Difference)** (`MLD_STD`, mig 008). Inversión de fase R vía `phase_invert_right` (gain -1 en `rightNode` del tono; ruido nunca invertido). Tokens A=SoNo+tono, B=SoNo catch, C=SπNo+tono (−10 dB), D=SπNo catch
-- ⚠️ Calibración SPL: `ref_db` actual fue medido con tono puro. El ruido blanco/rosa a la misma amplitud digital da ~3–5 dB SPL más que un tono puro. Para clínica estricta, calibrar ruido por separado.
+- ✅ **Calibración SPL del ruido por tipo** (mig 002). Tabla `noise_calibration_points` (calibration_id × noise_type ∈ pink/white/ssn) con `ref_db_spl @ 0 dBFS`. Engine: `playCalibrationNoise(type, dbfs, ear)` para loop continuo + `resolveNoiseRefDb(type)` que usa medición real si existe, fallback heurístico (ref+RMS estimado) si no. `playStimulusWithNoise` y `playStimulusSequenceWithNoise` consumen el ref real. UI `/calibracion` sección 4: reproducir ruido al nivel interno, medir con sonómetro, guardar. Carga vía `useCalibrationStore` en boot.
 
 ---
 

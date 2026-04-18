@@ -72,6 +72,37 @@ export function getActiveCalibrationCurve(): CalibCurvePoint[] {
   return activeCurve.slice()
 }
 
+export type NoiseCalibKind = 'white' | 'pink' | 'ssn'
+export type NoiseRefByType = Partial<Record<NoiseCalibKind, number>>
+
+let activeNoiseRef: NoiseRefByType = {}
+
+export function setActiveNoiseRef(ref: NoiseRefByType) {
+  activeNoiseRef = { ...ref }
+}
+
+export function getActiveNoiseRef(): NoiseRefByType {
+  return { ...activeNoiseRef }
+}
+
+/**
+ * Resuelve ref dB SPL @ 0 dBFS para tipo de ruido.
+ * Si hay calibración activa para ese tipo, la usa. Sino, fallback al heurístico
+ * antiguo (ref_tono + RMS estimado del buffer): pink≈-15, white≈-5, ssn≈-20.
+ */
+export function resolveNoiseRefDb(
+  type: NoiseCalibKind,
+  ear: Ear = 'binaural',
+  override?: NoiseRefByType,
+): number {
+  const tbl = override ?? activeNoiseRef
+  const v = tbl[type]
+  if (v !== undefined) return v
+  const toneRef = resolveRefDb(1000, ear)
+  const rms = type === 'ssn' ? -20 : type === 'pink' ? -15 : -5
+  return toneRef + rms
+}
+
 /**
  * Resuelve ref_db para (freq, ear) interpolando log-freq.
  * Prioridad: puntos del mismo oído → puntos binaurales → activeRefDb escalar.
@@ -510,10 +541,9 @@ export async function playStimulusWithNoise(
   const rms = opts.rms_dbfs ?? -20
   const ref = opts.refDb ?? resolveRefDb(1000, ear)
   const voiceGain = dbToGain(level_db - rms, ref)
-  // Ruido: el buffer blanco/rosa tiene RMS ≈ -3 dBFS (white) / variable (pink); aprox -15 dBFS pink tras escalado.
-  // Usamos el gain de mapeo SPL directo asumiendo que el ruido está cerca 0 dBFS. Para calibración estricta, medir.
-  const noiseRmsDbfs = noise_type === 'ssn' ? -20 : noise_type === 'pink' ? -15 : -5
-  const noiseGain = dbToGain(noise_level_db - noiseRmsDbfs, ref)
+  // Ruido: ref real medido (calibración) o fallback heurístico por tipo de buffer.
+  const noiseRef = resolveNoiseRefDb(noise_type as NoiseCalibKind, ear)
+  const noiseGain = Math.pow(10, (noise_level_db - noiseRef) / 20)
 
   const merger = ctx.createChannelMerger(2)
   const { l, r } = earGains(ear)
@@ -693,8 +723,8 @@ export async function playStimulusSequenceWithNoise(
   let srcN: AudioBufferSourceNode | null = null
   if (opts.noise) {
     const n = opts.noise
-    const noiseRmsDbfs = n.type === 'ssn' ? -20 : n.type === 'pink' ? -15 : -5
-    const noiseGain = dbToGain(n.level_db - noiseRmsDbfs, ref)
+    const noiseRef = resolveNoiseRefDb(n.type as NoiseCalibKind, ear)
+    const noiseGain = Math.pow(10, (n.level_db - noiseRef) / 20)
     const noiseBuf = (n.type === 'pink' || n.type === 'ssn') ? getPinkNoiseBuffer(ctx) : getWhiteNoiseBuffer(ctx)
     srcN = ctx.createBufferSource()
     srcN.buffer = noiseBuf
@@ -781,4 +811,47 @@ export async function playCalibrationTone(
   return () => {
     try { osc.stop() } catch {}
   }
+}
+
+/**
+ * Ruido continuo para calibración SPL del ruido (loop). gain lineal directo = 10^(dbfs/20),
+ * sin mapeo SPL. Para SSN aplica LP 1 kHz Q=0.707 (igual que motor de mezcla).
+ * Devuelve función stop.
+ */
+export async function playCalibrationNoise(
+  type: NoiseCalibKind,
+  dbfs: number,
+  ear: Ear = 'binaural',
+): Promise<() => void> {
+  const ctx = await ensureRunning()
+  const buf = (type === 'white') ? getWhiteNoiseBuffer(ctx) : getPinkNoiseBuffer(ctx)
+  const src = ctx.createBufferSource()
+  src.buffer = buf
+  src.loop = true
+
+  const gain = ctx.createGain()
+  gain.gain.value = Math.pow(10, dbfs / 20)
+
+  const merger = ctx.createChannelMerger(2)
+  const { l, r } = earGains(ear)
+  const leftNode = ctx.createGain(); leftNode.gain.value = l
+  const rightNode = ctx.createGain(); rightNode.gain.value = r
+
+  let head: AudioNode = src
+  if (type === 'ssn') {
+    const lp = ctx.createBiquadFilter()
+    lp.type = 'lowpass'
+    lp.frequency.value = 1000
+    lp.Q.value = 0.707
+    src.connect(lp)
+    head = lp
+  }
+
+  head.connect(gain)
+  gain.connect(leftNode); gain.connect(rightNode)
+  leftNode.connect(merger, 0, 0); rightNode.connect(merger, 0, 1)
+  merger.connect(ctx.destination)
+
+  src.start()
+  return () => { try { src.stop() } catch {} }
 }

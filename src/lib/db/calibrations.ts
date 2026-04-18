@@ -1,5 +1,5 @@
 import { getDb } from './client'
-import type { Calibration, CalibrationPoint, Ear } from '@/types'
+import type { Calibration, CalibrationPoint, Ear, NoiseCalibrationPoint, NoiseCalibType } from '@/types'
 
 export interface CreateCalibrationInput {
   label: string
@@ -116,4 +116,46 @@ export async function setActiveCalibration(id: number): Promise<void> {
 export async function deleteCalibration(id: number): Promise<void> {
   const db = await getDb()
   await db.execute('DELETE FROM calibrations WHERE id = $1', [id])
+}
+
+export interface UpsertNoisePointInput {
+  calibration_id: number
+  noise_type: NoiseCalibType
+  internal_level_dbfs: number
+  measured_db_spl: number
+  ref_db_spl: number
+}
+
+export async function upsertNoisePoint(input: UpsertNoisePointInput): Promise<void> {
+  const db = await getDb()
+  await db.execute(
+    `INSERT INTO noise_calibration_points
+       (calibration_id, noise_type, internal_level_dbfs, measured_db_spl, ref_db_spl)
+     VALUES ($1,$2,$3,$4,$5)
+     ON CONFLICT(calibration_id, noise_type)
+     DO UPDATE SET internal_level_dbfs=excluded.internal_level_dbfs,
+                   measured_db_spl=excluded.measured_db_spl,
+                   ref_db_spl=excluded.ref_db_spl,
+                   created_at=datetime('now')`,
+    [input.calibration_id, input.noise_type, input.internal_level_dbfs, input.measured_db_spl, input.ref_db_spl]
+  )
+}
+
+export async function listNoisePoints(calibrationId: number): Promise<NoiseCalibrationPoint[]> {
+  const db = await getDb()
+  return db.select<NoiseCalibrationPoint[]>(
+    'SELECT * FROM noise_calibration_points WHERE calibration_id = $1 ORDER BY noise_type',
+    [calibrationId]
+  )
+}
+
+export async function deleteNoisePoint(id: number): Promise<void> {
+  const db = await getDb()
+  await db.execute('DELETE FROM noise_calibration_points WHERE id = $1', [id])
+}
+
+export async function getActiveNoisePoints(): Promise<NoiseCalibrationPoint[]> {
+  const cal = await getActiveCalibration()
+  if (!cal) return []
+  return listNoisePoints(cal.id)
 }
