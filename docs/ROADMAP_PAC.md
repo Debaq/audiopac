@@ -151,7 +151,7 @@ Objetivo: que los dB reportados sean dB SPL reales, no pseudo-calibrados.
 
 ### Fase 4 — Procesamiento avanzado + pruebas PAC verbales
 - Denoise espectral
-- Trim automático robusto
+- ✅ **Trim automático robusto (VAD)**. `recording.ts` — ventana 10 ms hop 5 ms, RMS+ZCR, piso de ruido adaptativo (percentil 10 de energías), umbral = `noise_floor + 12 dB` (piso absoluto −50 dBFS), asistencia ZCR para fricativas (umbral adaptativo por percentil 70 de ZCR), cierre morfológico (huecos <80 ms rellenados) y apertura (islas <30 ms descartadas), márgenes pre 30 ms / post 50 ms. Fallback al método RMS fijo si VAD no detecta voz. Seleccionable por `trimMethod: 'vad'|'rms'` en `ProcessingOptions` (default `vad`)
 - Biblioteca de listas estándar (PAL, PALPA, HINT-ES)
 - ✅ **Dichotic Digits ES** (migración 014). Plantillas `DD_ES_FREE` (recuerdo libre) y `DD_ES_DIRECTED` (recuerdo dirigido alternando oído inicial). Usa `playStimulusPair` en `engine.ts` para disparar dos `AudioBuffer` simultáneos con mismo `startTime` (uno por oído). Lista `DICHOTIC_DIGITS_ES` (mig 012) con dígitos 1–9 excluyendo "siete". Scoring por oído con asimetría (R − L). Pares configurables (default 20 pares · 2 dígitos/oído · 55 dB HL).
 - SSW adaptado, SinB-ES (pendiente)

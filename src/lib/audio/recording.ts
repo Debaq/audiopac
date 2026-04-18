@@ -4,12 +4,22 @@ export interface RecordedClip {
   mimeType: string
 }
 
+export type TrimMethod = 'rms' | 'vad'
+
 export interface ProcessingOptions {
   targetRmsDbfs?: number
   hpHz?: number
   trimSilenceDbfs?: number
   fadeMs?: number
   targetSampleRate?: number
+  trimMethod?: TrimMethod
+  vadNoiseMarginDb?: number
+  vadPreMarginMs?: number
+  vadPostMarginMs?: number
+  vadMinSilenceMs?: number
+  vadMinSpeechMs?: number
+  vadAbsFloorDbfs?: number
+  vadZcrAssist?: boolean
 }
 
 export const DEFAULT_PROC: Required<ProcessingOptions> = {
@@ -18,6 +28,14 @@ export const DEFAULT_PROC: Required<ProcessingOptions> = {
   trimSilenceDbfs: -45,
   fadeMs: 10,
   targetSampleRate: 44100,
+  trimMethod: 'vad',
+  vadNoiseMarginDb: 12,
+  vadPreMarginMs: 30,
+  vadPostMarginMs: 50,
+  vadMinSilenceMs: 80,
+  vadMinSpeechMs: 30,
+  vadAbsFloorDbfs: -50,
+  vadZcrAssist: true,
 }
 
 export interface StimulusMetrics {
@@ -140,6 +158,107 @@ function findTrimBounds(data: Float32Array, sampleRate: number, thresholdDbfs: n
   return [start, end]
 }
 
+interface VadBoundsOpts {
+  noiseMarginDb: number
+  preMarginMs: number
+  postMarginMs: number
+  minSilenceMs: number
+  minSpeechMs: number
+  absFloorDbfs: number
+  zcrAssist: boolean
+}
+
+/**
+ * VAD robusto por RMS+ZCR con piso de ruido adaptativo y cierre/apertura morfológico.
+ * Ventana 10 ms hop 5 ms. Devuelve bounds en samples. Si no detecta voz, retorna null
+ * para que el llamante use fallback RMS fijo.
+ */
+function findVadBounds(data: Float32Array, sampleRate: number, o: VadBoundsOpts): [number, number] | null {
+  const winSamples = Math.max(1, Math.floor(sampleRate * 0.010))
+  const hopSamples = Math.max(1, Math.floor(sampleRate * 0.005))
+  const nFrames = Math.max(0, Math.floor((data.length - winSamples) / hopSamples) + 1)
+  if (nFrames < 4) return null
+
+  const rmsDb = new Float32Array(nFrames)
+  const zcr = new Float32Array(nFrames)
+  for (let f = 0; f < nFrames; f++) {
+    const off = f * hopSamples
+    let s = 0
+    let crossings = 0
+    let prev = data[off]
+    for (let k = 0; k < winSamples; k++) {
+      const v = data[off + k]
+      s += v * v
+      if ((prev >= 0 && v < 0) || (prev < 0 && v >= 0)) crossings++
+      prev = v
+    }
+    const rms = Math.sqrt(s / winSamples)
+    rmsDb[f] = rms > 0 ? 20 * Math.log10(rms) : -120
+    zcr[f] = crossings / winSamples
+  }
+
+  // Piso de ruido: percentil 10 de energías finitas
+  const sortedDb = Array.from(rmsDb).filter((v) => Number.isFinite(v)).sort((a, b) => a - b)
+  if (sortedDb.length === 0) return null
+  const noiseDb = sortedDb[Math.floor(sortedDb.length * 0.10)]
+  const primaryThrDb = Math.max(noiseDb + o.noiseMarginDb, o.absFloorDbfs)
+  const fricThrDb = primaryThrDb - 6
+
+  // ZCR típico de fricativa (ES /s/ /f/ /x/): umbral adaptativo — percentil 70 de ZCR
+  const sortedZcr = Array.from(zcr).slice().sort((a, b) => a - b)
+  const zcrHigh = sortedZcr[Math.floor(sortedZcr.length * 0.70)]
+
+  const voice = new Uint8Array(nFrames)
+  for (let f = 0; f < nFrames; f++) {
+    if (rmsDb[f] > primaryThrDb) voice[f] = 1
+    else if (o.zcrAssist && rmsDb[f] > fricThrDb && zcr[f] > zcrHigh) voice[f] = 1
+  }
+
+  // Descartar islas cortas (< minSpeechMs)
+  const minSpeechFrames = Math.max(1, Math.round(o.minSpeechMs / 5))
+  {
+    let f = 0
+    while (f < nFrames) {
+      if (voice[f] === 1) {
+        let j = f
+        while (j < nFrames && voice[j] === 1) j++
+        if (j - f < minSpeechFrames) for (let k = f; k < j; k++) voice[k] = 0
+        f = j
+      } else f++
+    }
+  }
+
+  // Rellenar huecos cortos (< minSilenceMs) entre voz
+  const minSilFrames = Math.max(1, Math.round(o.minSilenceMs / 5))
+  {
+    let f = 0
+    while (f < nFrames) {
+      if (voice[f] === 0) {
+        let j = f
+        while (j < nFrames && voice[j] === 0) j++
+        const leftVoice = f > 0 && voice[f - 1] === 1
+        const rightVoice = j < nFrames && voice[j] === 1
+        if (leftVoice && rightVoice && j - f < minSilFrames) for (let k = f; k < j; k++) voice[k] = 1
+        f = j
+      } else f++
+    }
+  }
+
+  let first = -1
+  let last = -1
+  for (let f = 0; f < nFrames; f++) {
+    if (voice[f] === 1) { if (first < 0) first = f; last = f }
+  }
+  if (first < 0) return null
+
+  const preSamples = Math.floor((o.preMarginMs / 1000) * sampleRate)
+  const postSamples = Math.floor((o.postMarginMs / 1000) * sampleRate)
+  const startSample = Math.max(0, first * hopSamples - preSamples)
+  const endSample = Math.min(data.length, last * hopSamples + winSamples + postSamples)
+  if (endSample <= startSample) return null
+  return [startSample, endSample]
+}
+
 async function resampleMono(buf: AudioBuffer, targetRate: number): Promise<AudioBuffer> {
   if (buf.sampleRate === targetRate && buf.numberOfChannels === 1) return buf
   const length = Math.round(buf.duration * targetRate)
@@ -190,7 +309,19 @@ export async function processClip(
   const hpBuf = await applyHighpass(resampled, o.hpHz)
 
   const srcData = hpBuf.getChannelData(0)
-  const [s, e] = findTrimBounds(srcData, hpBuf.sampleRate, o.trimSilenceDbfs)
+  let bounds: [number, number] | null = null
+  if (o.trimMethod === 'vad') {
+    bounds = findVadBounds(srcData, hpBuf.sampleRate, {
+      noiseMarginDb: o.vadNoiseMarginDb,
+      preMarginMs: o.vadPreMarginMs,
+      postMarginMs: o.vadPostMarginMs,
+      minSilenceMs: o.vadMinSilenceMs,
+      minSpeechMs: o.vadMinSpeechMs,
+      absFloorDbfs: o.vadAbsFloorDbfs,
+      zcrAssist: o.vadZcrAssist,
+    })
+  }
+  const [s, e] = bounds ?? findTrimBounds(srcData, hpBuf.sampleRate, o.trimSilenceDbfs)
   const trimmedLen = Math.max(1, e - s)
   const trimmed = new Float32Array(trimmedLen)
   trimmed.set(srcData.subarray(s, e))
