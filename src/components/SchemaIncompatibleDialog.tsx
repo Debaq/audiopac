@@ -70,8 +70,9 @@ export function SchemaIncompatibleDialog() {
           <li>Plantillas de tests personalizadas</li>
         </ul>
         <p style={{ margin: '0 0 24px', lineHeight: 1.5, color: '#ffd28e' }}>
-          AudioPAC sigue en beta. La app se cerrará automáticamente. Reabrila
-          y vas a poder instalar packs oficiales desde <strong>/catalogos</strong>.
+          AudioPAC sigue en beta. La app se cerrará al aceptar.{' '}
+          <strong>Tenés que reabrirla manualmente</strong>; al hacerlo vas a
+          poder instalar packs oficiales desde <strong>/catalogos</strong>.
         </p>
         <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
           <button
@@ -105,7 +106,7 @@ export function SchemaIncompatibleDialog() {
               fontWeight: 600,
             }}
           >
-            {busy ? 'Borrando…' : 'Aceptar y cerrar app'}
+            {busy ? 'Borrando…' : 'Aceptar (cerrar y reabrir manual)'}
           </button>
         </div>
       </div>
