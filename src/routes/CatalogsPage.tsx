@@ -36,6 +36,7 @@ export function CatalogsPage() {
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [progress, setProgress] = useState<InstallProgress | null>(null)
+  const [packsReloadKey, setPacksReloadKey] = useState(0)
 
   const load = async () => {
     setLoading(true); setError(null)
@@ -101,7 +102,7 @@ export function CatalogsPage() {
             Bajá listas de estímulos y packs de audio desde <a href={`https://github.com/${ASSETS_REPO}`} target="_blank" rel="noreferrer" className="underline inline-flex items-center gap-1">{ASSETS_REPO} <ExternalLink className="w-3 h-3" /></a>
           </p>
         </div>
-        <Button size="sm" variant="outline" onClick={load} disabled={loading || !!busy}>
+        <Button size="sm" variant="outline" onClick={() => { load(); setPacksReloadKey(k => k + 1) }} disabled={loading || !!busy}>
           <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /> Refrescar
         </Button>
       </div>
@@ -139,7 +140,7 @@ export function CatalogsPage() {
         </Card>
       )}
 
-      <PacksSection />
+      <PacksSection reloadKey={packsReloadKey} />
 
       <h2 className="text-xl font-semibold mb-3 mt-2">Corpus de habla (texto + audio)</h2>
 

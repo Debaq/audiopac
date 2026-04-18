@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { ArrowLeft, Play, Save, Trash2, LayoutGrid, FileText } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -8,13 +8,27 @@ import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { SequenceBuilder } from '@/components/SequenceBuilder'
+import { SRTConfigEditor, BLANK_SRT } from '@/components/editors/SRTConfigEditor'
+import { DichoticConfigEditor, BLANK_DICHOTIC } from '@/components/editors/DichoticConfigEditor'
+import { SharedConfigSection } from '@/components/editors/SharedConfigSection'
+import { AdvancedJsonEditor } from '@/components/editors/AdvancedJsonEditor'
 import { getTemplate, createTemplate, updateTemplate } from '@/lib/db/templates'
 import { playTonePreview, playSequence, ensureRunning } from '@/lib/audio/engine'
 import { useAuth } from '@/stores/auth'
 import { cn } from '@/lib/utils'
-import type { TestType, TestConfig } from '@/types'
+import type { TestType, TestConfig, SRTParams, DichoticDigitsParams } from '@/types'
 
-const BLANK_CONFIG: TestConfig = {
+type EngineKey = 'patterns' | 'srt' | 'dichotic' | 'hint' | 'matrix'
+
+function detectEngine(cfg: TestConfig): EngineKey {
+  if (cfg.srt) return 'srt'
+  if (cfg.dichotic_digits) return 'dichotic'
+  if (cfg.hint) return 'hint'
+  if (cfg.matrix) return 'matrix'
+  return 'patterns'
+}
+
+const BLANK_PATTERNS_CONFIG: TestConfig = {
   frequency: 1000,
   tones: {
     L: { label: 'Largo', duration_ms: 500 },
@@ -30,19 +44,58 @@ const BLANK_CONFIG: TestConfig = {
   level_db: 60,
 }
 
+const BLANK_SRT_CONFIG: TestConfig = {
+  tones: {},
+  isi_ms: 0,
+  iri_ms: 0,
+  envelope_ms: 0,
+  pattern_length: 0,
+  practice_sequences: [],
+  test_sequences: [],
+  channel: 'binaural',
+  level_db: 50,
+  srt: BLANK_SRT,
+}
+
+const BLANK_DICHOTIC_CONFIG: TestConfig = {
+  tones: {},
+  isi_ms: 0,
+  iri_ms: 0,
+  envelope_ms: 0,
+  pattern_length: 0,
+  practice_sequences: [],
+  test_sequences: [],
+  channel: 'binaural',
+  level_db: 55,
+  dichotic_digits: BLANK_DICHOTIC,
+}
+
+function blankForEngine(engine: EngineKey): TestConfig {
+  if (engine === 'srt') return BLANK_SRT_CONFIG
+  if (engine === 'dichotic') return BLANK_DICHOTIC_CONFIG
+  return BLANK_PATTERNS_CONFIG
+}
+
 export function TestEditorPage() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const profile = useAuth(s => s.activeProfile)
   const isNew = !id
   const tid = id ? Number(id) : null
+  const familyFromUrl = searchParams.get('family')
+  const engineFromUrl = (searchParams.get('engine') as EngineKey | null) ?? 'patterns'
 
   const [code, setCode] = useState('')
   const [name, setName] = useState('')
-  const [testType, setTestType] = useState<TestType>('DPS')
+  const [testType, setTestType] = useState<TestType>(engineFromUrl === 'patterns' ? 'DPS' : 'CUSTOM')
   const [description, setDescription] = useState('')
   const [isStandard, setIsStandard] = useState(false)
-  const [config, setConfig] = useState<TestConfig>(BLANK_CONFIG)
+  const [config, setConfig] = useState<TestConfig>(() => {
+    const base = blankForEngine(engineFromUrl)
+    return familyFromUrl ? { ...base, family: familyFromUrl } : base
+  })
+  const engine: EngineKey = detectEngine(config)
   const [saving, setSaving] = useState(false)
   const [practiceText, setPracticeText] = useState('')
   const [testText, setTestText] = useState('')
@@ -128,30 +181,49 @@ export function TestEditorPage() {
     await playSequence(seq, config)
   }
 
-  const save = async () => {
+  const goToRecord = async (listCode: string) => {
+    const returnTo = tid ? `/tests/${tid}` : `/tests`
+    const target = `/estimulos?list=${encodeURIComponent(listCode)}&returnTo=${encodeURIComponent(returnTo)}`
+    if (!tid && (!name.trim() || !code.trim())) {
+      alert('Guardá el test primero (completá nombre y código).')
+      return
+    }
+    await save({ redirectTo: target })
+  }
+
+  const save = async (opts?: { redirectTo?: string }) => {
     if (!name.trim() || !code.trim()) { alert('Nombre y código obligatorios'); return }
+    if (engine === 'srt' && !config.srt?.stimulus_list_code) {
+      alert('SRT requiere elegir una lista de estímulos.')
+      return
+    }
+    if (engine === 'dichotic' && !config.dichotic_digits?.stimulus_list_code) {
+      alert('Dichotic Digits requiere elegir una lista de estímulos.')
+      return
+    }
     setSaving(true)
     try {
       const practice = mode === 'visual' ? practiceSeqs : parsedPractice
       const test = mode === 'visual' ? testSeqs : parsedTest
-      const fullConfig: TestConfig = {
-        ...config,
-        practice_sequences: practice,
-        test_sequences: test,
-      }
+      const fullConfig: TestConfig = engine === 'patterns'
+        ? { ...config, practice_sequences: practice, test_sequences: test }
+        : config
+      let targetId: number | null = tid
       if (tid) {
         await updateTemplate(tid, { code, name, test_type: testType, description, config: fullConfig })
       } else {
-        await createTemplate({ code, name, test_type: testType, description, config: fullConfig, created_by: profile?.id })
+        targetId = await createTemplate({ code, name, test_type: testType, description, config: fullConfig, created_by: profile?.id })
       }
-      navigate('/tests')
+      navigate(opts?.redirectTo ?? '/tests', { state: { savedId: targetId } })
     } finally {
       setSaving(false)
     }
   }
 
+  const wideLayout = engine !== 'patterns'
+
   return (
-    <div className="p-8 max-w-4xl mx-auto">
+    <div className={`p-8 ${wideLayout ? 'max-w-[1400px]' : 'max-w-4xl'} mx-auto`}>
       <Link to="/tests" className="inline-flex items-center gap-2 text-sm text-[var(--muted-foreground)] hover:text-[var(--foreground)] mb-4">
         <ArrowLeft className="w-4 h-4" /> Volver
       </Link>
@@ -174,11 +246,15 @@ export function TestEditorPage() {
           </div>
           <div>
             <Label>Tipo</Label>
-            <Select value={testType} onChange={e => setTestType(e.target.value as TestType)} disabled={isStandard}>
-              <option value="DPS">DPS</option>
-              <option value="PPS">PPS</option>
-              <option value="CUSTOM">CUSTOM</option>
-            </Select>
+            {engine === 'patterns' ? (
+              <Select value={testType} onChange={e => setTestType(e.target.value as TestType)} disabled={isStandard}>
+                <option value="DPS">DPS</option>
+                <option value="PPS">PPS</option>
+                <option value="CUSTOM">CUSTOM</option>
+              </Select>
+            ) : (
+              <Input value={`Motor: ${engine.toUpperCase()}`} disabled readOnly />
+            )}
           </div>
           <div className="col-span-2">
             <Label>Nombre *</Label>
@@ -191,6 +267,41 @@ export function TestEditorPage() {
         </CardContent>
       </Card>
 
+      {engine === 'srt' && config.srt && (
+        <>
+          <SRTConfigEditor
+            value={config.srt}
+            onChange={(srt: SRTParams) => setConfig({ ...config, srt })}
+            disabled={isStandard}
+            onGoToRecord={goToRecord}
+          />
+          <div className="mb-4">
+            <SharedConfigSection value={config} onChange={setConfig} disabled={isStandard} />
+          </div>
+          <div className="mb-4">
+            <AdvancedJsonEditor value={config} onChange={setConfig} disabled={isStandard} />
+          </div>
+        </>
+      )}
+
+      {engine === 'dichotic' && config.dichotic_digits && (
+        <>
+          <DichoticConfigEditor
+            value={config.dichotic_digits}
+            onChange={(dichotic_digits: DichoticDigitsParams) => setConfig({ ...config, dichotic_digits })}
+            disabled={isStandard}
+            onGoToRecord={goToRecord}
+          />
+          <div className="mb-4">
+            <SharedConfigSection value={config} onChange={setConfig} disabled={isStandard} />
+          </div>
+          <div className="mb-4">
+            <AdvancedJsonEditor value={config} onChange={setConfig} disabled={isStandard} />
+          </div>
+        </>
+      )}
+
+      {engine === 'patterns' && (<>
       <Card className="mb-4">
         <CardHeader><CardTitle>Tonos</CardTitle></CardHeader>
         <CardContent>
@@ -382,9 +493,10 @@ export function TestEditorPage() {
           </Card>
         </>
       )}
+      </>)}
 
       {!isStandard && (
-        <Button size="lg" className="w-full" onClick={save} disabled={saving}>
+        <Button size="lg" className="w-full" onClick={() => save()} disabled={saving}>
           <Save className="w-5 h-5" /> {saving ? 'Guardando...' : 'Guardar test'}
         </Button>
       )}

@@ -523,6 +523,99 @@ export async function playStimulusBuffer(
 }
 
 /**
+ * Reproduce uno o más AudioBuffer en secuencia (opcionalmente precedidos por un carrier)
+ * con máscara contralateral opcional en el oído opuesto durante toda la presentación.
+ *
+ * Pensado para SRT con frase portadora + enmascaramiento.
+ */
+export async function playStimulusWithCarrierAndMasking(
+  targetBuf: AudioBuffer,
+  level_db: number,
+  ear: Ear,
+  opts: {
+    rms_dbfs?: number | null
+    refDb?: number
+    onEnd?: () => void
+    carrier?: { buffer: AudioBuffer; rms_dbfs?: number | null; lead_in_ms: number } | null
+    mask?: { noise_type: NoiseType; level_db: number } | null
+  } = {}
+): Promise<() => void> {
+  const ctx = await ensureRunning()
+  const ref = opts.refDb ?? resolveRefDb(1000, ear)
+  const rms = opts.rms_dbfs ?? -20
+  const gain = dbToGain(level_db - rms, ref)
+
+  const merger = ctx.createChannelMerger(2)
+  const { l, r } = earGains(ear)
+  const outL = ctx.createGain(); outL.gain.value = l
+  const outR = ctx.createGain(); outR.gain.value = r
+  outL.connect(merger, 0, 0)
+  outR.connect(merger, 0, 1)
+  merger.connect(ctx.destination)
+
+  const t0 = ctx.currentTime + 0.05
+  let tCarrierEnd = t0
+  const sources: AudioBufferSourceNode[] = []
+
+  if (opts.carrier) {
+    const rmsC = opts.carrier.rms_dbfs ?? -20
+    const gainC = dbToGain(level_db - rmsC, ref)
+    const srcC = ctx.createBufferSource()
+    srcC.buffer = opts.carrier.buffer
+    const gC = ctx.createGain(); gC.gain.value = gainC
+    srcC.connect(gC); gC.connect(outL); gC.connect(outR)
+    srcC.start(t0)
+    sources.push(srcC)
+    tCarrierEnd = t0 + opts.carrier.buffer.duration + (opts.carrier.lead_in_ms / 1000)
+  }
+
+  const tTargetStart = tCarrierEnd
+  const srcT = ctx.createBufferSource()
+  srcT.buffer = targetBuf
+  const gT = ctx.createGain(); gT.gain.value = gain
+  srcT.connect(gT); gT.connect(outL); gT.connect(outR)
+  srcT.start(tTargetStart)
+  sources.push(srcT)
+  const tEnd = tTargetStart + targetBuf.duration
+
+  let srcN: AudioBufferSourceNode | null = null
+  if (opts.mask && opts.mask.level_db > -99) {
+    const nt = opts.mask.noise_type
+    const noiseBuf = (nt === 'pink' || nt === 'ssn') ? getPinkNoiseBuffer(ctx) : getWhiteNoiseBuffer(ctx)
+    const noiseRef = resolveNoiseRefDb(nt as NoiseCalibKind, ear)
+    const noiseGain = Math.pow(10, (opts.mask.level_db - noiseRef) / 20)
+    srcN = ctx.createBufferSource()
+    srcN.buffer = noiseBuf
+    srcN.loop = true
+    const gN = ctx.createGain(); gN.gain.value = 0
+    // Contralateral: si signal va a L, máscara a R (y viceversa). Si binaural, sin máscara.
+    const contraL = ctx.createGain(); contraL.gain.value = ear === 'right' ? 1 : 0
+    const contraR = ctx.createGain(); contraR.gain.value = ear === 'left' ? 1 : 0
+    let head: AudioNode = srcN
+    if (nt === 'ssn') {
+      const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 1000; lp.Q.value = 0.707
+      srcN.connect(lp); head = lp
+    }
+    head.connect(gN); gN.connect(contraL); gN.connect(contraR)
+    contraL.connect(merger, 0, 0); contraR.connect(merger, 0, 1)
+    const fade = 0.05
+    gN.gain.setValueAtTime(0, t0)
+    gN.gain.linearRampToValueAtTime(noiseGain, t0 + fade)
+    gN.gain.setValueAtTime(noiseGain, tEnd - fade)
+    gN.gain.linearRampToValueAtTime(0, tEnd)
+    srcN.start(t0)
+    srcN.stop(tEnd + 0.02)
+  }
+
+  srcT.onended = () => opts.onEnd?.()
+
+  return () => {
+    for (const s of sources) { try { s.stop() } catch {} }
+    if (srcN) { try { srcN.stop() } catch {} }
+  }
+}
+
+/**
  * Reproduce un estímulo con ruido enmascarante simultáneo (HINT / SinB).
  * - Voz: buffer al `level_db` SPL (usa rms_dbfs para mapeo, igual que playStimulusBuffer)
  * - Ruido: loop del buffer blanco/rosa al `noise_level_db` SPL, arranca 200 ms antes y

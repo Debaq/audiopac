@@ -10,7 +10,7 @@ import {
 
 export const ASSETS_REPO = 'Debaq/audiopac-assets'
 export const ASSETS_BRANCH = 'main'
-export const ASSETS_RAW = `https://raw.githubusercontent.com/${ASSETS_REPO}/${ASSETS_BRANCH}`
+export const ASSETS_RAW = `https://cdn.jsdelivr.net/gh/${ASSETS_REPO}@${ASSETS_BRANCH}`
 export const ASSETS_RELEASES = `https://github.com/${ASSETS_REPO}/releases/download`
 
 export interface AssetAudioPack {

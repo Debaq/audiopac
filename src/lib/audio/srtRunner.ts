@@ -1,5 +1,5 @@
 import type { SRTParams, Stimulus, Ear } from '@/types'
-import { loadStimulusBuffer, playStimulusBuffer, type CalibCurvePoint, resolveRefDb } from './engine'
+import { loadStimulusBuffer, playStimulusBuffer, playStimulusWithCarrierAndMasking, type CalibCurvePoint, resolveRefDb } from './engine'
 import { loadStimulusWav } from '@/lib/fs/stimuli'
 
 export interface SRTTrial {
@@ -57,8 +57,6 @@ export class SRTController {
   private bufferCache: BufferCache = new Map()
   private stopHandle: (() => void) | null = null
 
-  /** Cola de stimulus_id por nivel (para rotar sin repetir). Se rellena on-demand. */
-  private queue: Map<number, number[]> = new Map()
   private usedIdsGlobal = new Set<number>()
 
   state: SRTState
@@ -216,18 +214,45 @@ export class SRTController {
     this.state.isPlaying = true
     trial.presented_at = Date.now()
     this.emit()
+    const ref = this.refDb ?? resolveRefDb(1000, this.ear, this.curve)
+
+    // Resolver carrier phrase (buffer por token)
+    let carrier: { buffer: AudioBuffer; rms_dbfs: number | null; lead_in_ms: number } | null = null
+    const cp = this.params.carrier_phrase
+    if (cp && cp.audio_token) {
+      const cstim = this.stimuli.find(s => s.token.toLowerCase() === cp.audio_token.toLowerCase())
+      if (cstim) {
+        try {
+          const cbuf = await this.getBuffer(cstim)
+          carrier = { buffer: cbuf, rms_dbfs: cstim.rms_dbfs, lead_in_ms: cp.lead_in_ms }
+        } catch { /* ignore carrier failure */ }
+      }
+    }
+
+    // Máscara contralateral
+    let mask: { noise_type: 'white' | 'pink' | 'narrow' | 'ssn'; level_db: number } | null = null
+    const m = this.params.masking
+    if (m && m.enabled && (this.ear === 'left' || this.ear === 'right')) {
+      const level = m.follow_level ? trial.level_db - m.offset_db : this.params.start_level_db - m.offset_db
+      mask = { noise_type: m.noise_type, level_db: level }
+    }
+
     await new Promise<void>((resolve) => {
-      const ref = this.refDb ?? resolveRefDb(1000, this.ear, this.curve)
-      playStimulusBuffer(buf, trial.level_db, {
-        ear: this.ear,
-        rms_dbfs: stim.rms_dbfs,
-        refDb: ref,
-        onEnd: () => {
-          this.state.isPlaying = false
-          this.emit()
-          resolve()
-        },
-      }).then(stop => { this.stopHandle = stop })
+      const fn = (carrier || mask)
+        ? playStimulusWithCarrierAndMasking(buf, trial.level_db, this.ear, {
+            rms_dbfs: stim.rms_dbfs,
+            refDb: ref,
+            carrier,
+            mask,
+            onEnd: () => { this.state.isPlaying = false; this.emit(); resolve() },
+          })
+        : playStimulusBuffer(buf, trial.level_db, {
+            ear: this.ear,
+            rms_dbfs: stim.rms_dbfs,
+            refDb: ref,
+            onEnd: () => { this.state.isPlaying = false; this.emit(); resolve() },
+          })
+      fn.then(stop => { this.stopHandle = stop })
     })
     this.stopHandle = null
   }
@@ -257,10 +282,35 @@ export class SRTController {
   private advanceIfLevelComplete(fromHydrate: boolean) {
     const lvlStat = this.state.levelStats.find(s => s.level_db === this.state.currentLevel)
     if (!lvlStat || !lvlStat.completed) return
-    // Chequeo bracketing: hay al menos un pass y un fail estrictamente debajo de algún pass
+    const rule = this.params.cutoff_rule ?? { kind: 'bracketing' as const }
     const passes = this.state.levelStats.filter(s => s.completed && s.pass).map(s => s.level_db)
     const fails = this.state.levelStats.filter(s => s.completed && !s.pass).map(s => s.level_db)
-    if (passes.length > 0 && fails.some(f => passes.some(p => f < p))) {
+
+    // Regla custom: fixed_trials — terminar cuando se alcanzó cantidad fija
+    if (rule.kind === 'fixed_trials' && this.state.trials.length >= rule.trials) {
+      if (passes.length > 0) this.state.srtDb = Math.min(...passes)
+      this.state.finished = true
+      this.state.ended_reason = 'max_trials'
+      return
+    }
+
+    // Regla custom: plateau — N niveles consecutivos completos dentro de delta_db
+    if (rule.kind === 'plateau') {
+      const completedSorted = this.state.levelStats.filter(s => s.completed).sort((a, b) => b.level_db - a.level_db)
+      if (completedSorted.length >= rule.consecutive_levels) {
+        const recent = completedSorted.slice(0, rule.consecutive_levels).map(s => s.level_db)
+        const spread = Math.max(...recent) - Math.min(...recent)
+        if (spread <= rule.delta_db) {
+          this.state.srtDb = Math.round(recent.reduce((a, b) => a + b, 0) / recent.length)
+          this.state.finished = true
+          this.state.ended_reason = 'bracketed'
+          return
+        }
+      }
+    }
+
+    // Chequeo bracketing: hay al menos un pass y un fail estrictamente debajo de algún pass
+    if (rule.kind === 'bracketing' && passes.length > 0 && fails.some(f => passes.some(p => f < p))) {
       this.state.srtDb = Math.min(...passes)
       this.state.finished = true
       this.state.ended_reason = 'bracketed'

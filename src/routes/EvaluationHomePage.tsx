@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Activity, Ear as EarIcon, Clock, Play, Trash2 } from 'lucide-react'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { Activity, Ear as EarIcon, Clock, Play, Trash2, AlertTriangle, ExternalLink } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
@@ -11,6 +11,7 @@ import { listTemplates } from '@/lib/db/templates'
 import { createSession, listInProgressSessions, cancelSession } from '@/lib/db/sessions'
 import { getActiveCalibration, getActiveCurve } from '@/lib/db/calibrations'
 import { PreSessionCheck } from '@/components/PreSessionCheck'
+import { getListReadiness, readinessFromConfig, type ListReadiness } from '@/lib/packs/readiness'
 import { useAuth } from '@/stores/auth'
 import type { TestTemplateParsed, Ear, ResponseMode, SessionWithDetails } from '@/types'
 import { formatDateTime } from '@/lib/utils'
@@ -28,6 +29,7 @@ export function EvaluationHomePage() {
   const [responseMode, setResponseMode] = useState<ResponseMode>('manual')
   const [starting, setStarting] = useState(false)
   const [showCheck, setShowCheck] = useState(false)
+  const [readiness, setReadiness] = useState<ListReadiness | null>(null)
 
   useEffect(() => {
     Promise.all([listTemplates(true), listInProgressSessions()]).then(([t, ip]) => {
@@ -50,6 +52,15 @@ export function EvaluationHomePage() {
     () => templates.find(t => t.id === templateId) ?? null,
     [templates, templateId]
   )
+
+  useEffect(() => {
+    if (!selectedTemplate) { setReadiness(null); return }
+    const code = readinessFromConfig(selectedTemplate.config)
+    if (!code) { setReadiness(null); return }
+    getListReadiness(code).then(setReadiness).catch(() => setReadiness(null))
+  }, [selectedTemplate])
+
+  const blocked = readiness !== null && readiness.missing > 0
 
   const requestStart = () => {
     if (!patientId || !templateId || !profile) return
@@ -172,7 +183,21 @@ export function EvaluationHomePage() {
         </Card>
       )}
 
-      <Button size="lg" className="w-full" disabled={!patientId || !templateId || starting} onClick={requestStart}>
+      {blocked && readiness && (
+        <div className="mb-3 rounded-md border border-red-500/40 bg-red-500/5 p-3 text-sm flex items-center gap-2">
+          <AlertTriangle className="w-4 h-4 text-red-500" />
+          <div className="flex-1">
+            Faltan <b>{readiness.missing}</b> de {readiness.total} grabaciones en <code>{readiness.list_code}</code>. No se puede iniciar hasta completar.
+          </div>
+          <Link
+            to={`/estimulos?list=${encodeURIComponent(readiness.list_code)}`}
+            className="inline-flex items-center gap-1 text-[var(--primary)] hover:underline text-xs"
+          >
+            Ir a /estímulos <ExternalLink className="w-3 h-3" />
+          </Link>
+        </div>
+      )}
+      <Button size="lg" className="w-full" disabled={!patientId || !templateId || starting || blocked} onClick={requestStart}>
         <Activity className="w-5 h-5" /> {starting ? 'Iniciando...' : 'Iniciar evaluación'}
       </Button>
 

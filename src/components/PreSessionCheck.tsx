@@ -18,7 +18,7 @@ const FREQ = 1000
 const DUR = 600
 
 export function PreSessionCheck({ onProceed, onCancel }: Props) {
-  const { status, active, ageDays } = useCalibrationStore()
+  const { status, ageDays } = useCalibrationStore()
   const louder = useMemo<Choice>(() => (Math.random() < 0.5 ? 'A' : 'B'), [])
   const [played, setPlayed] = useState(false)
   const [playing, setPlaying] = useState(false)

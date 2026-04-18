@@ -57,6 +57,39 @@ export interface ToneDefinition {
   phase_invert_right?: boolean
 }
 
+export type SRTMethod = 'hughson_westlake_mod' | 'chaiklin_ventry' | 'descending_simple'
+
+export interface SRTCarrierPhrase {
+  /** Token de la lista que se reproduce antes del target (ej. "diga"). */
+  audio_token: string
+  /** Silencio tras la portadora y antes del target, ms. */
+  lead_in_ms: number
+}
+
+export interface SRTFamiliarization {
+  enabled: boolean
+  /** Nivel demo, típicamente alto (SRT+30). */
+  level_db: number
+  /** Mostrar palabras al paciente durante la fase. */
+  show_list: boolean
+  /** Palabras de demo antes del test. */
+  count?: number
+}
+
+export interface SRTMasking {
+  enabled: boolean
+  noise_type: NoiseType
+  /** dB bajo el nivel del signal. Positivo = máscara más débil. */
+  offset_db: number
+  /** Si true, máscara sigue al signal nivel por nivel. */
+  follow_level: boolean
+}
+
+export type SRTCutoffRule =
+  | { kind: 'bracketing' }
+  | { kind: 'fixed_trials'; trials: number }
+  | { kind: 'plateau'; consecutive_levels: number; delta_db: number }
+
 export interface SRTParams {
   stimulus_list_code: string
   start_level_db: number
@@ -67,9 +100,29 @@ export interface SRTParams {
   max_level_db: number
   threshold_pass_ratio: number
   max_total_trials?: number
+  /** Método adaptativo. Default 'hughson_westlake_mod'. */
+  method?: SRTMethod
+  carrier_phrase?: SRTCarrierPhrase | null
+  familiarization?: SRTFamiliarization | null
+  masking?: SRTMasking | null
+  cutoff_rule?: SRTCutoffRule
 }
 
 export type DichoticMode = 'free' | 'directed'
+export type DichoticBlockOrder = 'lrlr' | 'llrr' | 'interleaved'
+export type DichoticScoringGranularity = 'per_pair' | 'per_position' | 'per_digit'
+export type DichoticCatchPlacement = 'random' | 'every_n' | 'start_end'
+
+export interface DichoticPairDef {
+  left: string[]
+  right: string[]
+}
+
+export interface DichoticCatchTrials {
+  enabled: boolean
+  count: number
+  placement: DichoticCatchPlacement
+}
 
 export interface DichoticDigitsParams {
   stimulus_list_code: string
@@ -78,6 +131,18 @@ export interface DichoticDigitsParams {
   isi_ms: number
   level_db: number
   mode: DichoticMode
+  /** Default true. Si false, usa `fixed_pairs` (si existen). */
+  randomize?: boolean
+  /** Pares fijos definidos por el investigador. Tokens deben existir en la lista. */
+  fixed_pairs?: DichoticPairDef[]
+  /** Orden de bloques en modo dirigido. Default 'lrlr'. */
+  directed_block_order?: DichoticBlockOrder
+  /** Catch trials (pares mono) para validar atención. */
+  catch_trials?: DichoticCatchTrials | null
+  /** Granularidad de scoring. Default 'per_pair'. */
+  scoring_granularity?: DichoticScoringGranularity
+  /** Markdown de práctica pre-test. */
+  practice_instructions_md?: string
 }
 
 export interface TestConfig {
@@ -96,6 +161,21 @@ export interface TestConfig {
   dichotic_digits?: DichoticDigitsParams
   hint?: HINTParams
   matrix?: MatrixParams
+  family?: string
+  /** Consigna al paciente, markdown, mostrada pre-start. */
+  patient_instructions_md?: string
+  /** Notas libres del examinador. */
+  examiner_notes_md?: string
+  /** Feedback durante el test. */
+  feedback?: {
+    practice: 'off' | 'correct_incorrect' | 'with_text'
+    test: 'off' | 'correct_incorrect'
+    practice_text_md?: string
+  }
+  /** Timeout de respuesta (ms). 0/null = sin timeout. */
+  response_timeout_ms?: number
+  /** Escape hatch: overrides arbitrarios que el runner lee. */
+  advanced_json?: Record<string, unknown>
 }
 
 export interface TestTemplate {

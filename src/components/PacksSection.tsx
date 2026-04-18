@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Package, Download, Trash2, AlertTriangle, Check, RefreshCw, Mic, Music, FileAudio, Info } from 'lucide-react'
+import { Package, Download, Trash2, AlertTriangle, Check, Mic, Music, FileAudio, Info } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -26,7 +26,7 @@ function norm(s: string): string {
   return s.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '')
 }
 
-export function PacksSection() {
+export function PacksSection({ reloadKey = 0 }: { reloadKey?: number } = {}) {
   const [index, setIndex] = useState<PacksIndex | null>(null)
   const [installed, setInstalled] = useState<Record<string, InstalledPack>>({})
   const [loading, setLoading] = useState(true)
@@ -54,7 +54,7 @@ export function PacksSection() {
     }
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, [reloadKey])
 
   async function runInstall(entry: PacksIndexEntry) {
     if (busy) return
@@ -93,9 +93,6 @@ export function PacksSection() {
             Cada pack agrupa pruebas + listas + interpretación clínica. Instalá solo los que vayas a usar.
           </p>
         </div>
-        <Button size="sm" variant="outline" onClick={load} disabled={loading || !!busy}>
-          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /> Refrescar
-        </Button>
       </div>
 
       {error && (

@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Mic, Square, Play, Trash2, Plus, RefreshCw, Check, AlertTriangle, Globe } from 'lucide-react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import { Mic, Square, Play, Trash2, Plus, RefreshCw, Check, AlertTriangle, Globe, Scissors } from 'lucide-react'
+import { StimulusEditDialog } from '@/components/StimulusEditDialog'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -41,6 +43,10 @@ const CATEGORIES: { value: StimulusCategory; label: string }[] = [
 export function StimuliPage() {
   const profile = useAuth(s => s.activeProfile)
   const { countryCode, loaded, load, setCountryCode } = useSettingsStore()
+  const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const requestedListCode = searchParams.get('list')
+  const returnTo = searchParams.get('returnTo')
 
   const [lists, setLists] = useState<StimulusList[]>([])
   const [selectedListId, setSelectedListId] = useState<number | null>(null)
@@ -55,6 +61,8 @@ export function StimuliPage() {
 
   const [newToken, setNewToken] = useState('')
 
+  const [showAllCountries, setShowAllCountries] = useState(false)
+  const [editStimulus, setEditStimulus] = useState<Stimulus | null>(null)
   const [recordingId, setRecordingId] = useState<number | null>(null)
   const recRef = useRef<Awaited<ReturnType<typeof startMicRecording>> | null>(null)
   const [busyId, setBusyId] = useState<number | null>(null)
@@ -65,8 +73,14 @@ export function StimuliPage() {
   useEffect(() => { setNewListCountry(countryCode) }, [countryCode])
 
   const refreshLists = async () => {
-    const rows = await listStimulusLists(countryCode)
+    // Si viene ?list=CODE, cargamos sin filtro país para garantizar que la lista aparezca aunque sea de otra región.
+    const ignoreCountry = showAllCountries || !!requestedListCode
+    const rows = await listStimulusLists(ignoreCountry ? undefined : countryCode)
     setLists(rows)
+    if (requestedListCode) {
+      const match = rows.find(l => l.code === requestedListCode)
+      if (match) { setSelectedListId(match.id); return }
+    }
     if (rows.length > 0 && (selectedListId == null || !rows.find(l => l.id === selectedListId))) {
       setSelectedListId(rows[0].id)
     } else if (rows.length === 0) {
@@ -79,7 +93,7 @@ export function StimuliPage() {
     setItems(await listStimuli(selectedListId))
   }
 
-  useEffect(() => { if (loaded) refreshLists() }, [loaded, countryCode])
+  useEffect(() => { if (loaded) refreshLists() }, [loaded, countryCode, showAllCountries, requestedListCode])
   useEffect(() => { refreshItems() }, [selectedListId])
 
   const selectedList = useMemo(() => lists.find(l => l.id === selectedListId) ?? null, [lists, selectedListId])
@@ -227,7 +241,7 @@ export function StimuliPage() {
     try {
       const bytes = await loadStimulusWav(s.file_path)
       const ctx = new AudioContext()
-      const buf = await ctx.decodeAudioData(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength))
+      const buf = await ctx.decodeAudioData(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer)
       await ctx.close()
       const m = measureBuffer(buf)
       await updateStimulusRecording(s.id, {
@@ -265,11 +279,18 @@ export function StimuliPage() {
 
   return (
     <div className="p-8 max-w-5xl mx-auto">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold">Estímulos verbales</h1>
-        <p className="text-[var(--muted-foreground)]">
-          Graba, procesa y normaliza listas para logoaudiometría y PAC verbales.
-        </p>
+      <div className="mb-6 flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-3xl font-bold">Estímulos verbales</h1>
+          <p className="text-[var(--muted-foreground)]">
+            Graba, procesa y normaliza listas para logoaudiometría y PAC verbales.
+          </p>
+        </div>
+        {returnTo && (
+          <Button variant="outline" size="sm" onClick={() => navigate(returnTo)}>
+            ← Volver al editor
+          </Button>
+        )}
       </div>
 
       <Card className="mb-4">
@@ -279,12 +300,25 @@ export function StimuliPage() {
           </CardTitle>
           <CardDescription>Filtra listas por país. Las listas LatAm son visibles para todos.</CardDescription>
         </CardHeader>
-        <CardContent>
-          <Select value={countryCode} onChange={e => setCountryCode(e.target.value)} className="max-w-xs">
+        <CardContent className="flex flex-wrap items-center gap-3">
+          <Select
+            value={countryCode}
+            onChange={e => setCountryCode(e.target.value)}
+            className="max-w-xs"
+            disabled={showAllCountries}
+          >
             {COUNTRY_OPTIONS.map(c => (
               <option key={c.code} value={c.code}>{c.label}</option>
             ))}
           </Select>
+          <label className="inline-flex items-center gap-2 text-sm cursor-pointer">
+            <input
+              type="checkbox"
+              checked={showAllCountries}
+              onChange={e => setShowAllCountries(e.target.checked)}
+            />
+            <span>Ver listas de <b>todas las regiones</b> (p.ej. Sharvard ES)</span>
+          </label>
         </CardContent>
       </Card>
 
@@ -404,6 +438,9 @@ export function StimuliPage() {
                                 <Button size="sm" variant="ghost" onClick={() => preview(s)} disabled={isBusy}>
                                   {isPlaying ? <Square className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
                                 </Button>
+                                <Button size="sm" variant="ghost" onClick={() => setEditStimulus(s)} disabled={isBusy} title="Recortar audio">
+                                  <Scissors className="w-3.5 h-3.5" />
+                                </Button>
                                 <Button size="sm" variant="ghost" onClick={() => reanalyze(s)} disabled={isBusy} title="Re-analizar">
                                   <RefreshCw className="w-3.5 h-3.5" />
                                 </Button>
@@ -493,6 +530,14 @@ export function StimuliPage() {
           )}
         </div>
       </div>
+
+      {editStimulus && (
+        <StimulusEditDialog
+          stimulus={editStimulus}
+          onClose={() => setEditStimulus(null)}
+          onSaved={() => refreshItems()}
+        />
+      )}
     </div>
   )
 }

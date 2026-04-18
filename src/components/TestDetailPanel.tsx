@@ -3,12 +3,26 @@ import { Link } from 'react-router-dom'
 import {
   Play, Package, Edit2, Trash2, BookOpen, Target, Stethoscope,
   Users, AlertTriangle, Clock, ExternalLink, FileText, Video, Link as LinkIcon,
+  Mic, Download,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Markdown } from '@/lib/markdown'
 import { getTemplateRichMeta, type TemplateRichMeta } from '@/lib/packs/interpretation'
-import type { TestTemplateParsed } from '@/types'
+import { getListReadiness, readinessFromConfig, type ListReadiness } from '@/lib/packs/readiness'
+import { fetchPacksIndex } from '@/lib/packs/installer'
+import type { PackRequirements } from '@/lib/packs/types'
+import type { TestConfig, TestTemplateParsed } from '@/types'
+
+type EngineKey = 'patterns' | 'srt' | 'dichotic' | 'hint' | 'matrix'
+const ENGINES_WITH_EDITOR: ReadonlySet<EngineKey> = new Set(['patterns', 'srt', 'dichotic'])
+function detectEngine(cfg: TestConfig): EngineKey {
+  if (cfg.srt) return 'srt'
+  if (cfg.dichotic_digits) return 'dichotic'
+  if (cfg.hint) return 'hint'
+  if (cfg.matrix) return 'matrix'
+  return 'patterns'
+}
 
 function Section({
   icon: Icon, title, children,
@@ -39,6 +53,8 @@ export function TestDetailPanel({
 }) {
   const [rich, setRich] = useState<TemplateRichMeta | null>(null)
   const [loading, setLoading] = useState(true)
+  const [readiness, setReadiness] = useState<ListReadiness | null>(null)
+  const [packReq, setPackReq] = useState<PackRequirements | null>(null)
 
   useEffect(() => {
     setLoading(true)
@@ -46,6 +62,22 @@ export function TestDetailPanel({
       .then(setRich)
       .finally(() => setLoading(false))
   }, [template.id])
+
+  useEffect(() => {
+    const code = readinessFromConfig(template.config)
+    if (!code) { setReadiness(null); return }
+    getListReadiness(code).then(setReadiness).catch(() => setReadiness(null))
+  }, [template.id, template.config])
+
+  useEffect(() => {
+    if (!rich?.pack_code) { setPackReq(null); return }
+    fetchPacksIndex()
+      .then(idx => setPackReq(idx.packs.find(p => p.id === rich.pack_code)?.requirements ?? null))
+      .catch(() => setPackReq(null))
+  }, [rich?.pack_code])
+
+  const needsRecording = readiness !== null
+  const blocked = needsRecording && readiness!.missing > 0
 
   const meta = rich?.test_meta ?? null
   const ageRange = (() => {
@@ -77,12 +109,41 @@ export function TestDetailPanel({
             )}
           </div>
           <div className="flex gap-2 shrink-0">
-            <Link to={`/evaluacion?template=${template.id}`}>
-              <Button size="sm"><Play className="w-4 h-4" /> Iniciar evaluación</Button>
-            </Link>
-            <Link to={`/tests/${template.id}`}>
-              <Button size="sm" variant="outline"><Edit2 className="w-4 h-4" /> Editar</Button>
-            </Link>
+            {blocked ? (
+              <Button
+                size="sm"
+                disabled
+                title={`Faltan ${readiness!.missing} de ${readiness!.total} grabaciones en la lista ${readiness!.list_code}`}
+              >
+                <Play className="w-4 h-4" /> Iniciar evaluación
+              </Button>
+            ) : (
+              <Link to={`/evaluacion?template=${template.id}`}>
+                <Button size="sm"><Play className="w-4 h-4" /> Iniciar evaluación</Button>
+              </Link>
+            )}
+            {(() => {
+              const engine = detectEngine(template.config)
+              const hasEditor = ENGINES_WITH_EDITOR.has(engine)
+              const label = template.is_standard ? 'Ver' : 'Editar'
+              if (!hasEditor) {
+                return (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled
+                    title={`Editor del motor ${engine.toUpperCase()} aún no disponible`}
+                  >
+                    <Edit2 className="w-4 h-4" /> {label}
+                  </Button>
+                )
+              }
+              return (
+                <Link to={`/tests/${template.id}`}>
+                  <Button size="sm" variant="outline"><Edit2 className="w-4 h-4" /> {label}</Button>
+                </Link>
+              )
+            })()}
             {!template.is_standard && onDelete && (
               <Button size="sm" variant="destructive" onClick={onDelete}>
                 <Trash2 className="w-4 h-4" />
@@ -122,6 +183,46 @@ export function TestDetailPanel({
           </span>
         </div>
       </div>
+
+      {needsRecording && (
+        <div className={
+          blocked
+            ? 'rounded-md border border-red-500/40 bg-red-500/5 p-3 space-y-2'
+            : 'rounded-md border border-emerald-500/40 bg-emerald-500/5 p-3 space-y-2'
+        }>
+          <div className="text-sm flex items-center gap-2">
+            <AlertTriangle className={blocked ? 'w-4 h-4 text-red-500' : 'w-4 h-4 text-emerald-500'} />
+            <div className="flex-1">
+              {blocked ? (
+                <>Faltan <b>{readiness!.missing}</b> de {readiness!.total} grabaciones en <code>{readiness!.list_code}</code>. No se puede iniciar hasta completar.</>
+              ) : (
+                <>Lista <code>{readiness!.list_code}</code> lista ({readiness!.recorded}/{readiness!.total} grabadas).</>
+              )}
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2 pl-6">
+            {packReq === 'audio_pack' && (
+              <Link to="/catalogos">
+                <Button size="sm" variant="outline">
+                  <Download className="w-3.5 h-3.5" /> Descargar audio del pack
+                  <ExternalLink className="w-3 h-3 opacity-60" />
+                </Button>
+              </Link>
+            )}
+            <Link to={`/estimulos?list=${encodeURIComponent(readiness!.list_code)}`}>
+              <Button size="sm" variant={packReq === 'audio_pack' ? 'ghost' : 'outline'}>
+                <Mic className="w-3.5 h-3.5" /> Grabar yo mismo
+                <ExternalLink className="w-3 h-3 opacity-60" />
+              </Button>
+            </Link>
+          </div>
+          {packReq === 'audio_pack' && (
+            <p className="text-[10px] text-[var(--muted-foreground)] pl-6">
+              Este pack ofrece audios oficiales (ej. Sharvard-ES peninsular). Si preferís tu propia voz/dialecto, podés grabar los tokens vos mismo.
+            </p>
+          )}
+        </div>
+      )}
 
       <div className="h-px bg-[var(--border)]" />
 

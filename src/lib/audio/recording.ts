@@ -415,7 +415,7 @@ export function encodeWav(buf: AudioBuffer): Uint8Array {
 
 export async function decodeWavBytes(bytes: Uint8Array): Promise<AudioBuffer> {
   const ctx = new AudioContext()
-  const buf = await ctx.decodeAudioData(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength))
+  const buf = await ctx.decodeAudioData(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer)
   await ctx.close()
   return buf
 }

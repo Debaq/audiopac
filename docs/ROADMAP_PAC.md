@@ -454,7 +454,7 @@ Redactar `purpose_md` / `how_it_works_md` / `protocol_md` / `target_population_m
 | `sinb-es-v1` | 1 | ✅ v1.1.0 (SRT en SSN con refs Killion/Byrne/Hochmuth, figura-fondo) |
 | `palpa-es-v1` | — | ✅ v1.1.0 (pack listas con refs Kay-Lesser-Coltheart/Valle-Cuetos/Ellis-Young/Franklin) |
 | `matrix-es-v1` | 1 | ✅ v1.1.0 (Matrix 5-AFC con refs Hochmuth/Kollmeier, test-retest ±1 dB) |
-| `hint-es-clinico-v1` | 70 | ✅ v1.1.0 (descripción clínica extendida con refs Aubanel/Nilsson/Soli-Wong/Hall) |
+| `hint-es-clinico-v1` | 70 | ✅ v1.2.0 (ficha clínica por lista: purpose/how/protocol/target/contraindic + refs Aubanel/Nilsson/Soli-Wong/Hall en cada uno de los 70 tests) |
 | `pps-pinheiro-v1` | 1 | ✅ v1.1.0 (PPS estándar 880/1430 Hz con refs Pinheiro/Musiek) |
 | `dps-musiek-v1` | 1 | ✅ v1.1.0 (DPS estándar 500/250 ms con refs Musiek-Baran-Pinheiro/Bellis) |
 
@@ -523,3 +523,218 @@ Es un refactor medio-grande: UI + schema pack + backfill de contenido clínico (
 3. Ficha rica vacía + render markdown de campos opcionales.
 4. Redactar contenido clínico pack por pack y re-publicar en `audiopac-assets`.
 5. Referencias cruzadas (sugerir tests relacionados por familia).
+
+### 8.6 Editores por motor
+
+**Estado actual (MVP v1):** SRT y Dichotic Digits tienen editores nativos. HINT y Matrix siguen solo vía packs estándar (pendiente).
+
+#### 8.6.1 Infraestructura común ✅ hecho
+
+- ✅ `TestEditorPage` lee `?engine=` y branchea secciones. `detectEngine(config)` también sirve para templates existentes.
+- ✅ `blankForEngine(engine)` devuelve `TestConfig` base por motor (tonos vacíos + params del engine seteados).
+- ✅ Layout adaptativo: `max-w-4xl` para patterns, `max-w-[1400px]` + grid 2-cols para SRT/Dichotic/HINT/Matrix (izq params, der listado/análisis).
+- ✅ `ENGINES_WITH_EDITOR` en `TestsPage.tsx` y `TestDetailPanel.tsx` controla qué motores habilitan "+ Crear nuevo" / botón Editar.
+- ✅ **Readiness + gating universal** (`src/lib/packs/readiness.ts`): `getListReadiness(code)` devuelve `{total, recorded, missing}`. `readinessFromConfig` extrae el `stimulus_list_code` del engine activo. Se usa en:
+  - `TestDetailPanel`: banner rojo + botón "Iniciar" disabled si faltan grabaciones.
+  - `EvaluationHomePage`: banner pre-run + bloqueo del botón principal.
+  - Editores: chip de estado inline.
+- ✅ **Acceso a grabación integrado**: handler `goToRecord(listCode)` en `TestEditorPage` → guarda el test (crea o update) y navega a `/estimulos?list=CODE&returnTo=/tests/<id>`. `StimuliPage` lee `?list` (fuerza `ignoreCountry` para mostrar Sharvard ES u otros), `?returnTo` muestra botón **← Volver al editor**.
+- ✅ **Descarga pack audio**: `TestDetailPanel` detecta `pack.requirements === 'audio_pack'` y ofrece doble botón "Descargar del pack" (→ `/catalogos`) + "Grabar yo mismo" (→ `/estimulos`).
+- ✅ `<InlineListCreator>` (`src/components/editors/InlineListCreator.tsx`): modal genérico para crear `stimulus_list` desde el editor (nombre, país, seed tokens opcional). Reutilizado por SRT + Dichotic.
+- ✅ `<StimulusEditDialog>` (`src/components/StimulusEditDialog.tsx`): modal con waveform canvas + sliders inicio/fin + preview recortado → re-encode WAV + `updateStimulusRecording`. Accesible desde `/estimulos` por token.
+- ✅ `<TokenInfoDialog>` (`src/components/TokenInfoDialog.tsx`): modal al clickear un chip de token, muestra análisis fonético completo (ver §8.6.5).
+
+#### 8.6.2 Editor SRT ✅ hecho (v1 básico)
+
+`src/components/editors/SRTConfigEditor.tsx` — layout 2 columnas.
+
+**Columna izquierda (params):**
+- Selector de lista filtrada `category='srt'` + botón **+ Nueva** abre `InlineListCreator`.
+- Grid 2×4: nivel inicial, palabras/nivel, pass ratio, max trials, paso ↑/↓, piso, techo.
+- Caja explicativa Hughson-Westlake modificado (Carhart-Jerger 1959).
+
+**Columna derecha (contenido de la lista):**
+- Badge estándar (bloqueada) / editable según `is_standard`.
+- Input con separador **coma / punto y coma / newline** → agrega múltiples tokens de un saque (`casa, mesa, perro` → 3 items).
+- Resumen del set (sílabas, acentuación, flags, conteos C/V).
+- Listado de chips clickables con color por estado (grabado / no-bisílabo / neutro) → clic abre `TokenInfoDialog`.
+- Gating integrado + link "Guardar y grabar".
+
+#### 8.6.3 Editor Dichotic Digits ✅ hecho (v1 básico + secuencia fija)
+
+`src/components/editors/DichoticConfigEditor.tsx`.
+
+- Selector lista + **+ Nueva** con seed de **8 dígitos ES sin "siete"** (bisílabo — rompe onset alignment).
+- Params: modo (free/directed), pares, dígitos/oído, ISI, nivel dB HL.
+- **Toggle secuencia de pares** ✅:
+  - **Aleatoria (runtime)**: `generatePairs()` clásico — cada sesión distinto.
+  - **Fija (investigador)**: editor grid — N filas, slots L/R con `<select>` por posición desde pool de tokens grabados, botón "Rellenar fila al azar" y "Rellenar N al azar". Runtime usa `buildFixedPairs()` en `dichoticDigitsRunner.ts` mapeando token→stimulus_id.
+- Explicación **modos** en UI: libre (Musiek 1983, sensibilidad cortical temporal/callosa) vs dirigido (Strouse-Wilson 1999, atención selectiva top-down).
+- Readiness con link "Guardar y grabar".
+
+#### 8.6.4 Editores pendientes
+
+- ⏳ **HINT / SinB**: `config.hint` — `stimulus_list_code`, `start_snr_db`, `noise_level_db`, `noise_type` (pink/ssn/white), `sentences_per_level`, `threshold_pass_ratio`, pasos SNR, bounds.
+- ⏳ **Matrix 5-AFC**: `config.matrix` — `stimulus_list_code`, `columns`, `start_snr_db`, `noise_level_db`, `noise_type`, `inter_word_gap_ms`, `sentences_per_level`, `threshold_pass_ratio`, pasos, bounds, `max_total_trials`. Nota: metadata `column` (0..4) por stimulus se edita en `/estimulos`.
+
+#### 8.6.5 Análisis fonético español ✅ hecho
+
+`src/lib/es/phonetics.ts` — utilidades pragmáticas para listas ES (no IPA estricto).
+
+- `syllabify(word)`: segmentación silábica con reglas ES — digrafos `ch/ll/rr/qu` como consonante única, clusters inseparables (`pr/pl/br/bl/tr/dr/fr/fl/gr/gl/cr/cl`), diptongo si débil+fuerte sin tilde / dos débiles distintas, hiato si dos fuertes o débil tildada. ~95% correcto; casos borde tipo "idea" (3 síl reales vs 2 calculadas) fallan.
+- `classifyStress(count, stressedIdx)`: aguda / llana-grave / esdrújula / sobresdrújula. Regla ES: tilde manda; sino penúltima si termina en vocal/n/s, última otherwise.
+- `analyze(word) → PhonemeAnalysis`: syllables, syllable_count, stressed_index, stress_type + label, has_written_accent, vowels[], consonants[] (con digrafos agrupados), has_diphthong, has_hiato, disilabo, issues[].
+- `classifyConsonant(letter, nextChar?)`: manner (oclusiva / fricativa / africada / nasal / lateral / vibrante_simple / vibrante_multiple / aproximante) + place (bilabial / labiodental / dental_alveolar / palatal / velar / glotal) + voiced. Desambigua `c`/`g` según vocal siguiente.
+- `splitOnsetCoda(syllable)`: consonantes antes/después de la vocal.
+- `articulatoryStats(tokens)`: agrega por manner/place/voiced, cuenta onset/coda/abiertas/cerradas.
+
+`src/components/PhonemeBalanceChart.tsx` — chart visible en SRT (toggle "Ver balance fonémico"):
+
+- **Consonantes**: barras horizontales por letra; largo=observado%, línea vertical=esperado ES (RAE/CREA). 14 consonantes top + extras observadas.
+- **Vocales**: mismas 5 barras (a/e/i/o/u).
+- **Balance articulatorio**: barras por modo (oclusiva/fricativa/nasal/…), por punto (dental-alveolar/bilabial/…), mini-cards de estructura silábica (% abiertas CV vs cerradas CVC+; ES esperado ~70% abiertas) y sonoridad (voiced/voiceless %).
+- **Balance score** 0–100 por grupo: `100 − Σ|obs−esperado|`. Etiqueta: balanceado (≥85) / aceptable (70–85) / desbalanceado (50–70) / muy desbalanceado (<50).
+- Layout 2 columnas (cons ancha + vocales/articulatorio compacto) para ahorrar vertical.
+
+`<TokenInfoDialog>` reusa `analyze()` para modal de detalle por palabra: división silábica con tónica resaltada, badges (sílabas, acentuación, tilde, diptongo, hiato), grids Consonantes/Vocales con letras en cajitas color, audio info si grabado, issues.
+
+#### 8.6.6 Personalización real — knobs clínicos por motor (pendiente)
+
+El estado actual de los editores expone los params canónicos de cada runner, pero **no basta para personalizar protocolos clínicos**. Un investigador que quiere replicar un paper o armar su propio protocolo necesita knobs que hoy están hardcoded o ausentes. La ruta elegida es **A — expandir schemas**: agregar los knobs a los tipos + runner + UI.
+
+##### 8.6.6.1 SRT — knobs por agregar
+
+Extender `SRTParams` con:
+
+```ts
+interface SRTParams {
+  // existentes...
+
+  /** Método adaptativo. Default 'hughson_westlake_mod'. */
+  method?: 'hughson_westlake_mod' | 'chaiklin_ventry' | 'descending_simple'
+  /** Frase portadora. Si presente, se reproduce antes de cada palabra. */
+  carrier_phrase?: { audio_token: string; lead_in_ms: number } | null
+  /** Familiarización pre-test. */
+  familiarization?: {
+    enabled: boolean
+    level_db: number               // típicamente SRT+30 o 40 dB HL
+    show_list: boolean             // mostrar palabras al paciente
+  } | null
+  /** Enmascaramiento contralateral. */
+  masking?: {
+    enabled: boolean
+    noise_type: 'pink' | 'nbn' | 'white' | 'ssn'
+    offset_db: number              // dB bajo el nivel de presentación
+    follow_level: boolean          // si true, máscara sigue al signal
+  } | null
+  /** Criterio de corte custom (override del bracketing por defecto). */
+  cutoff_rule?:
+    | { kind: 'bracketing' }  // default
+    | { kind: 'fixed_trials'; trials: number }
+    | { kind: 'plateau'; consecutive_levels: number; delta_db: number }
+}
+```
+
+Runner `SRTController` y `SRTRun` deben:
+- Cargar `carrier_phrase.audio_token` de la lista y concatenar antes del target.
+- Respetar `familiarization`: modo demo previo al test (sin scoring).
+- Reproducir máscara en canal contralateral durante cada presentación, nivel relativo al target.
+- Cambiar lógica de fin de sesión según `cutoff_rule.kind`.
+
+Editor UI:
+- Selector método.
+- Acordeón "Frase portadora" con token picker.
+- Acordeón "Familiarización" con nivel + checkbox mostrar lista.
+- Acordeón "Enmascaramiento contralateral" con tipo/offset/follow toggle.
+- Tabs para `cutoff_rule`.
+
+##### 8.6.6.2 Dichotic Digits — knobs por agregar
+
+Extender `DichoticDigitsParams`:
+
+```ts
+interface DichoticDigitsParams {
+  // existentes...
+
+  /** Orden de bloques en modo dirigido. */
+  directed_block_order?: 'lrlr' | 'llrr' | 'interleaved'
+  /** Catch trials (pares mono) para validar atención. */
+  catch_trials?: {
+    enabled: boolean
+    count: number
+    placement: 'random' | 'every_n' | 'start_end'
+  } | null
+  /** Granularidad de scoring. */
+  scoring_granularity?: 'per_pair' | 'per_position' | 'per_digit'
+  /** Texto custom para la instrucción de práctica. */
+  practice_instructions_md?: string
+}
+```
+
+Runner:
+- `directed_block_order='interleaved'` alterna L/R por trial; `lrlr` 10+10 con L primero; `llrr` 10+10 agrupado.
+- Catch trials insertan un par con solo un oído activo en posiciones según `placement`.
+- `scoring_granularity='per_digit'` registra cada dígito por separado (expande `expected_pattern` y permite scoring posicional en `SessionReportPage`).
+
+Editor UI:
+- Selector orden bloques (solo visible si `mode='directed'`).
+- Input catch_trials count + placement.
+- Radio scoring_granularity.
+- Textarea markdown para practice_instructions_md.
+
+##### 8.6.6.3 Knobs generalizables (todos los engines)
+
+Agregar campos opcionales a `TestConfig` (shared, no por engine):
+
+```ts
+interface TestConfig {
+  // existentes...
+
+  /** Consigna al paciente, mostrada pre-start. Markdown. */
+  patient_instructions_md?: string
+  /** Feedback durante el test. */
+  feedback?: {
+    practice: 'off' | 'correct_incorrect' | 'with_text'
+    test: 'off' | 'correct_incorrect'
+    practice_text_md?: string
+  }
+  /** Timeout de respuesta (ms). Si paciente no responde, cuenta como error. */
+  response_timeout_ms?: number
+  /** Notas libres del investigador. Visible en ficha del test. */
+  examiner_notes_md?: string
+  /** Escape hatch: overrides arbitrarios que el runner lee. */
+  advanced_json?: Record<string, unknown>
+}
+```
+
+Runner base (todos): leer `patient_instructions_md` y mostrarlo en el modal pre-start antes del primer trial. Aplicar `response_timeout_ms` al botón/keypress handler. `feedback` condiciona render de "✓/✗" post-trial.
+
+Editor: sección común "Consigna & feedback" en todos los editores no-patterns (acordeón colapsable). Textarea con preview markdown. Switch feedback por fase.
+
+##### 8.6.6.4 Escape hatch JSON
+
+Acordeón "⚙ Configuración avanzada (JSON)" al final del editor (todos los engines) con:
+- Textarea monoespaciada editando `JSON.stringify(config, null, 2)`.
+- Validación en vivo (parse OK / error).
+- Preserva campos no expuestos por la UI (`advanced_json` u otros que el runner de futuro agregue).
+- Warning: "Uso experimental — cambios no validados pueden romper el test".
+
+##### 8.6.6.5 Plan de implementación
+
+Prioridad (ruta C mixta ya definida en §8.6.6 — primero expandir schemas, escape hatch como cola):
+
+1. ✅ **SRT v2** — `method` + `masking` + `familiarization` + `carrier_phrase` + `cutoff_rule`. Runner (`playStimulusWithCarrierAndMasking` en engine, lógica de corte fixed_trials/plateau/bracketing) + editor con acordeones + `SRTRun` fase familiarización con demo sin scoring. Pack `logoaud-latam-v1` puede exponer ejemplos en updates futuros.
+2. ✅ **Generalizables v1** — `TestConfig.patient_instructions_md` + `feedback` + `response_timeout_ms` + `examiner_notes_md`. Componente `<PatientInstructionsModal>` reusable. `<SharedConfigSection>` acordeón común. Wired en `SRTRun` y `DichoticDigitsRun`: modal pre-start, feedback opcional practice/test, auto-fail por timeout.
+3. ✅ **Dichotic v2** — `directed_block_order` (lrlr/llrr/interleaved) + `catch_trials` (count/placement random/every_n/start_end) + `scoring_granularity` (per_pair/per_position/per_digit) + `practice_instructions_md`. Runner inserta catch trials mono, `firstEarFor()` para block order, `answerDigit()` per-digit. UI con badge catch + modal práctica.
+4. ✅ **SRT cutoff_rule** y Dichotic `examiner_notes_md` (compartido en `SharedConfigSection`).
+5. ✅ **Escape hatch JSON** — `<AdvancedJsonEditor>` acordeón genérico con validación en vivo, aplicar/revertir, preserva `advanced_json` y campos fuera de UI. Integrado en editores SRT y Dichotic.
+6. **HINT editor** (§8.6.4) — arrancar con los knobs básicos de `HINTParams`, aplicar el mismo patrón de 2 cols + patient_instructions + balance fonémico.
+7. **Matrix editor** (§8.6.4) — idem HINT, especializar para grid 5×10.
+
+##### 8.6.6.6 Próximas ampliaciones del análisis fonético
+
+- **Sugerencias automáticas**: "te faltan fricativas velares (/x/) — agregá 'jota, joya, jugo'" basado en desviación por clase articulatoria.
+- **Score chi-square** propio: reemplazar `100 − Σ|diff|` por chi-cuadrado normalizado contra el corpus de referencia, más riguroso estadísticamente.
+- **Balance por contraste mínimo** (útil para PALPA): detectar si la lista tiene pares mínimos suficientes (sordo/sonoro, nasal/oral, etc.) para discriminación.
+- **Cross-engine**: aplicar `PhonemeBalanceChart` también en Dichotic (verificar monosilabicidad), HINT (frases → longitud media, balance por frase), Matrix (5-AFC vale para cada columna).
+- **Preview TTS opcional**: pronunciar un token dudoso vía Web Speech API `speechSynthesis` (ES-ES / ES-MX) para verificar acentuación sin grabar.

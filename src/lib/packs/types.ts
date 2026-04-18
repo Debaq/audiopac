@@ -141,6 +141,8 @@ export interface PackManifest {
    * `{{asymmetry_pct}}`, `{{srt_db}}`, `{{metric_value}}`, `{{norm_band}}`.
    */
   report_template_md?: string
+  /** Mapa { familyCode → label legible } para mostrar al usuario. */
+  families?: Record<string, string>
   metadata?: Record<string, unknown>
 }
 

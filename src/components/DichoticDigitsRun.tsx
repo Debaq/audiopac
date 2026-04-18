@@ -11,6 +11,7 @@ import { getStimulusListByCode, listStimuli } from '@/lib/db/stimuli'
 import { DichoticDigitsController, type DichoticState } from '@/lib/audio/dichoticDigitsRunner'
 import { ensureRunning, type CalibCurvePoint } from '@/lib/audio/engine'
 import { useKeyboard, Kbd } from '@/hooks/useKeyboard'
+import { PatientInstructionsModal } from '@/components/PatientInstructionsModal'
 import type { TestSession, TestTemplateParsed, Patient, DichoticDigitsParams } from '@/types'
 import { cn } from '@/lib/utils'
 
@@ -34,8 +35,13 @@ export function DichoticDigitsRun({ session, template, patient, params }: Props)
   const [showHelp, setShowHelp] = useState(false)
   const [revealTokens, setRevealTokens] = useState(false)
 
-  // Para modo directed: oído a reportar primero (alterna o se elige por evaluador)
-  const [firstEar, setFirstEar] = useState<'left' | 'right'>('left')
+  const [showInstructions, setShowInstructions] = useState(false)
+  const [showPractice, setShowPractice] = useState(false)
+  const timeoutRef = useRef<number | null>(null)
+
+  const cfg = template.config
+  const fb = cfg.feedback ?? { practice: 'correct_incorrect' as const, test: 'off' as const }
+  const timeoutMs = cfg.response_timeout_ms ?? 0
 
   useEffect(() => {
     (async () => {
@@ -64,10 +70,23 @@ export function DichoticDigitsRun({ session, template, patient, params }: Props)
         })))
       }
       setState({ ...ctrl.state })
+      if (prev.length === 0) {
+        if (cfg.patient_instructions_md) setShowInstructions(true)
+        if (params.practice_instructions_md) setShowPractice(true)
+      }
       const unsub = ctrl.subscribe(setState)
       return () => { unsub() }
     })()
   }, [sid])
+
+  useEffect(() => () => {
+    if (timeoutRef.current) { clearTimeout(timeoutRef.current); timeoutRef.current = null }
+  }, [])
+
+  const firstEar = useMemo<'left' | 'right'>(() => {
+    if (!state || !ctrlRef.current) return 'left'
+    return ctrlRef.current.firstEarFor(state.currentIndex)
+  }, [state?.currentIndex])
 
   const current = useMemo(() => {
     if (!state) return null
@@ -89,12 +108,23 @@ export function DichoticDigitsRun({ session, template, patient, params }: Props)
     return { leftCorrect: lc, rightCorrect: rc, answered: answered.length, total, asymmetryPct: asym }
   }, [state])
 
+  const clearResponseTimeout = () => {
+    if (timeoutRef.current) { clearTimeout(timeoutRef.current); timeoutRef.current = null }
+  }
+
   const handlePlay = async () => {
     const ctrl = ctrlRef.current
     if (!ctrl || ctrl.state.finished || ctrl.state.isPlaying) return
     await ensureRunning()
     setRevealTokens(true)
     await ctrl.play()
+    if (timeoutMs > 0) {
+      clearResponseTimeout()
+      timeoutRef.current = window.setTimeout(() => {
+        const p = ctrlRef.current?.currentPair()
+        if (p && p.left_correct === undefined) handleMark(false, false)
+      }, timeoutMs)
+    }
   }
 
   const handleMark = async (leftCorrect: boolean, rightCorrect: boolean) => {
@@ -102,14 +132,17 @@ export function DichoticDigitsRun({ session, template, patient, params }: Props)
     if (!ctrl || ctrl.state.isPlaying) return
     const pair = ctrl.currentPair()
     if (!pair) return
+    clearResponseTimeout()
     ctrl.answer(leftCorrect, rightCorrect)
-    if (leftCorrect && rightCorrect) setFlash('both')
-    else if (leftCorrect) setFlash('left')
-    else if (rightCorrect) setFlash('right')
-    else setFlash(null)
-    setTimeout(() => setFlash(null), 400)
+    if (fb.test === 'correct_incorrect') {
+      if (leftCorrect && rightCorrect) setFlash('both')
+      else if (leftCorrect) setFlash('left')
+      else if (rightCorrect) setFlash('right')
+      else setFlash(null)
+      setTimeout(() => setFlash(null), 400)
+    }
 
-    const expected = `L:${pair.left_tokens.join(',')}|R:${pair.right_tokens.join(',')}`
+    const expected = `L:${pair.left_tokens.join(',')}|R:${pair.right_tokens.join(',')}${pair.is_catch ? `|CATCH:${pair.catch_ear}` : ''}`
     const given = `L:${leftCorrect ? '1' : '0'}|R:${rightCorrect ? '1' : '0'}`
     const both = leftCorrect && rightCorrect
     await saveResponse({
@@ -122,8 +155,6 @@ export function DichoticDigitsRun({ session, template, patient, params }: Props)
       reaction_time_ms: pair.presented_at ? Date.now() - pair.presented_at : null,
     })
     setRevealTokens(false)
-    // Alternar oído inicial si modo directed
-    if (params.mode === 'directed') setFirstEar(e => e === 'left' ? 'right' : 'left')
     ctrl.next()
   }
 
@@ -246,7 +277,14 @@ export function DichoticDigitsRun({ session, template, patient, params }: Props)
           <Card className="mb-6 border-2 border-[var(--primary)]/20">
             <div className="h-1 bg-[var(--primary)]" />
             <CardContent className="p-8">
-              {params.mode === 'directed' && (
+              {current.is_catch && (
+                <div className="text-center mb-4">
+                  <Badge className="text-sm bg-amber-500">
+                    Catch trial — solo oído <span className="uppercase ml-1">{current.catch_ear === 'left' ? 'izquierdo' : 'derecho'}</span>
+                  </Badge>
+                </div>
+              )}
+              {params.mode === 'directed' && !current.is_catch && (
                 <div className="text-center mb-4">
                   <Badge className="text-sm">
                     Reportar primero oído <span className="uppercase ml-1">{firstEar === 'left' ? 'izquierdo' : 'derecho'}</span>
@@ -389,6 +427,22 @@ export function DichoticDigitsRun({ session, template, patient, params }: Props)
         )}
 
         {showHelp && <ShortcutsOverlay onClose={() => setShowHelp(false)} />}
+        {showInstructions && cfg.patient_instructions_md && (
+          <PatientInstructionsModal
+            instructions_md={cfg.patient_instructions_md}
+            onStart={() => setShowInstructions(false)}
+            onClose={() => setShowInstructions(false)}
+          />
+        )}
+        {showPractice && params.practice_instructions_md && !showInstructions && (
+          <PatientInstructionsModal
+            title="Práctica"
+            instructions_md={params.practice_instructions_md}
+            onStart={() => setShowPractice(false)}
+            onClose={() => setShowPractice(false)}
+            startLabel="Comenzar test"
+          />
+        )}
       </div>
     </div>
   )

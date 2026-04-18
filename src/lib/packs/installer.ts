@@ -31,7 +31,7 @@ function extractTestsMeta(manifest: PackManifest): Record<string, Record<string,
   for (const t of manifest.tests ?? []) {
     const meta: Record<string, unknown> = {}
     for (const f of TEST_META_FIELDS) {
-      const v = (t as Record<string, unknown>)[f]
+      const v = (t as unknown as Record<string, unknown>)[f]
       if (v !== undefined && v !== null) meta[f] = v
     }
     if (Object.keys(meta).length > 0) out[t.code] = meta
@@ -42,6 +42,7 @@ function extractTestsMeta(manifest: PackManifest): Record<string, Record<string,
 function serializePackMetadata(manifest: PackManifest): string | null {
   const merged: Record<string, unknown> = { ...(manifest.metadata ?? {}) }
   if (manifest.report_template_md) merged.report_template_md = manifest.report_template_md
+  if (manifest.families && Object.keys(manifest.families).length > 0) merged.families = manifest.families
   const testsMeta = extractTestsMeta(manifest)
   if (testsMeta) merged.tests_meta = testsMeta
   return Object.keys(merged).length > 0 ? JSON.stringify(merged) : null

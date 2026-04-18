@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { playCalibrationTone, playCalibrationNoise, ensureRunning } from '@/lib/audio/engine'
 import {
-  createCalibration, listCalibrations, setActiveCalibration, deleteCalibration, getActiveCalibration,
+  createCalibration, listCalibrations, setActiveCalibration, deleteCalibration,
   isCalibrationExpired, upsertPoint, listPoints, deletePoint,
   upsertNoisePoint, listNoisePoints, deleteNoisePoint,
 } from '@/lib/db/calibrations'

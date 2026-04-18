@@ -173,6 +173,7 @@ export interface TemplateTreeInfo {
   pack_name: string | null
   pack_category: string | null
   family: string | null
+  family_label: string | null
 }
 
 export async function listTemplateTreeInfo(): Promise<Map<number, TemplateTreeInfo>> {
@@ -194,10 +195,15 @@ export async function listTemplateTreeInfo(): Promise<Map<number, TemplateTreeIn
   const map = new Map<number, TemplateTreeInfo>()
   for (const r of rows) {
     let family: string | null = null
+    let family_label: string | null = null
     if (r.metadata_json) {
       try {
-        const parsed = JSON.parse(r.metadata_json) as { tests_meta?: Record<string, PackTestMeta> }
+        const parsed = JSON.parse(r.metadata_json) as {
+          tests_meta?: Record<string, PackTestMeta>
+          families?: Record<string, string>
+        }
         family = parsed.tests_meta?.[r.template_code]?.family ?? null
+        if (family && parsed.families?.[family]) family_label = parsed.families[family]
       } catch { /* ignore */ }
     }
     map.set(r.template_id, {
@@ -206,6 +212,7 @@ export async function listTemplateTreeInfo(): Promise<Map<number, TemplateTreeIn
       pack_name: r.pack_name,
       pack_category: r.pack_category,
       family,
+      family_label,
     })
   }
   return map

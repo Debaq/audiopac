@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Play, Check, X, StopCircle, Keyboard, AlertTriangle, Flag } from 'lucide-react'
+import { Play, Check, X, StopCircle, Keyboard, AlertTriangle, Flag, GraduationCap } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Textarea } from '@/components/ui/textarea'
@@ -9,9 +9,11 @@ import { Badge } from '@/components/ui/badge'
 import { finishSession, cancelSession, saveResponse, listResponses } from '@/lib/db/sessions'
 import { getStimulusListByCode, listStimuli } from '@/lib/db/stimuli'
 import { SRTController, type SRTState } from '@/lib/audio/srtRunner'
-import { ensureRunning, type CalibCurvePoint } from '@/lib/audio/engine'
+import { ensureRunning, playStimulusBuffer, loadStimulusBuffer, type CalibCurvePoint, resolveRefDb } from '@/lib/audio/engine'
+import { loadStimulusWav } from '@/lib/fs/stimuli'
 import { useKeyboard, Kbd } from '@/hooks/useKeyboard'
-import type { TestSession, TestTemplateParsed, Patient, SRTParams } from '@/types'
+import { PatientInstructionsModal } from '@/components/PatientInstructionsModal'
+import type { TestSession, TestTemplateParsed, Patient, SRTParams, Stimulus } from '@/types'
 import { cn } from '@/lib/utils'
 
 interface Props {
@@ -27,11 +29,22 @@ export function SRTRun({ session, template, patient, params }: Props) {
 
   const [loadError, setLoadError] = useState<string | null>(null)
   const ctrlRef = useRef<SRTController | null>(null)
+  const stimRef = useRef<Stimulus[]>([])
   const [state, setState] = useState<SRTState | null>(null)
   const [notes, setNotes] = useState('')
   const [finishing, setFinishing] = useState(false)
   const [flash, setFlash] = useState<'correct' | 'incorrect' | null>(null)
   const [showHelp, setShowHelp] = useState(false)
+  const [showInstructions, setShowInstructions] = useState(false)
+  const [phase, setPhase] = useState<'familiarization' | 'test'>('test')
+  const [famIndex, setFamIndex] = useState(0)
+  const [famPlaying, setFamPlaying] = useState(false)
+  const timeoutRef = useRef<number | null>(null)
+
+  const cfg = template.config
+  const fb = cfg.feedback ?? { practice: 'correct_incorrect' as const, test: 'off' as const }
+  const timeoutMs = cfg.response_timeout_ms ?? 0
+  const familiarization = params.familiarization
 
   useEffect(() => {
     (async () => {
@@ -49,6 +62,7 @@ export function SRTRun({ session, template, patient, params }: Props) {
       }
       const ctrl = new SRTController(params, withAudio, session.ear, session.ref_db_snapshot ?? undefined, curve)
       ctrlRef.current = ctrl
+      stimRef.current = withAudio
       const prev = await listResponses(sid)
       if (prev.length > 0) {
         ctrl.hydrate(prev.map(r => ({
@@ -59,10 +73,20 @@ export function SRTRun({ session, template, patient, params }: Props) {
         })))
       }
       setState({ ...ctrl.state })
+      // Fase inicial: si no hay responses y hay consigna, mostrar modal; si hay familiarización, arrancar ahí
+      if (prev.length === 0) {
+        if (cfg.patient_instructions_md) setShowInstructions(true)
+        if (familiarization?.enabled) setPhase('familiarization')
+      }
       const unsub = ctrl.subscribe(setState)
       return () => { unsub() }
     })()
   }, [sid])
+
+  // Cleanup timeout on unmount
+  useEffect(() => () => {
+    if (timeoutRef.current) { clearTimeout(timeoutRef.current); timeoutRef.current = null }
+  }, [])
 
   const pending = useMemo(() => {
     if (!state) return null
@@ -79,13 +103,25 @@ export function SRTRun({ session, template, patient, params }: Props) {
     return ctrl.pendingTrial() ?? ctrl.prepareNext()
   }
 
+  const clearResponseTimeout = () => {
+    if (timeoutRef.current) { clearTimeout(timeoutRef.current); timeoutRef.current = null }
+  }
+
   const handlePlay = async () => {
+    if (phase === 'familiarization') { playFamiliarization(); return }
     const ctrl = ctrlRef.current
     if (!ctrl || ctrl.state.finished || ctrl.state.isPlaying) return
     await ensureRunning()
     const trial = handleEnsureTrial()
     if (!trial) return
     await ctrl.play(trial)
+    // Arm response timeout si corresponde
+    if (timeoutMs > 0) {
+      clearResponseTimeout()
+      timeoutRef.current = window.setTimeout(() => {
+        if (ctrlRef.current?.pendingTrial()) handleAnswer(false)
+      }, timeoutMs)
+    }
   }
 
   const handleAnswer = async (correct: boolean) => {
@@ -93,9 +129,12 @@ export function SRTRun({ session, template, patient, params }: Props) {
     if (!ctrl || ctrl.state.isPlaying) return
     const trial = ctrl.pendingTrial()
     if (!trial) return
+    clearResponseTimeout()
     ctrl.answer(correct)
-    setFlash(correct ? 'correct' : 'incorrect')
-    setTimeout(() => setFlash(null), 350)
+    if (fb.test === 'correct_incorrect') {
+      setFlash(correct ? 'correct' : 'incorrect')
+      setTimeout(() => setFlash(null), 350)
+    }
     await saveResponse({
       session_id: sid,
       item_index: trial.index,
@@ -106,6 +145,36 @@ export function SRTRun({ session, template, patient, params }: Props) {
       reaction_time_ms: trial.presented_at ? Date.now() - trial.presented_at : null,
     })
   }
+
+  const playFamiliarization = async () => {
+    if (!familiarization || famPlaying) return
+    const stims = stimRef.current
+    if (stims.length === 0) return
+    setFamPlaying(true)
+    await ensureRunning()
+    const stim = stims[famIndex % stims.length]
+    if (!stim.file_path) { setFamPlaying(false); return }
+    try {
+      const bytes = await loadStimulusWav(stim.file_path)
+      const buf = await loadStimulusBuffer(stim.file_path, bytes)
+      const ref = session.ref_db_snapshot ?? resolveRefDb(1000, session.ear)
+      await new Promise<void>((resolve) => {
+        playStimulusBuffer(buf, familiarization.level_db, {
+          ear: session.ear, rms_dbfs: stim.rms_dbfs, refDb: ref,
+          onEnd: () => resolve(),
+        })
+      })
+    } finally {
+      setFamPlaying(false)
+    }
+  }
+
+  const famTotal = familiarization?.count ?? 3
+  const handleFamNext = () => {
+    if (famIndex + 1 >= famTotal) { setPhase('test'); return }
+    setFamIndex(i => i + 1)
+  }
+  const handleSkipFamiliarization = () => setPhase('test')
 
   const handleCancel = async () => {
     if (!confirm('¿Cancelar evaluación?')) return
@@ -210,7 +279,35 @@ export function SRTRun({ session, template, patient, params }: Props) {
           <StatTile label="SRT estimado" value={state.srtDb !== null ? `${state.srtDb} dB` : '—'} big />
         </div>
 
-        {!state.finished && (
+        {phase === 'familiarization' && familiarization && (
+          <Card className="mb-6 border-2 border-amber-500/30 bg-amber-500/5">
+            <div className="h-1 bg-amber-500" />
+            <CardContent className="p-8">
+              <div className="flex items-center gap-2 text-xs uppercase tracking-widest text-amber-700 dark:text-amber-400 mb-3 justify-center">
+                <GraduationCap className="w-4 h-4" /> Familiarización ({famIndex + 1}/{famTotal})
+              </div>
+              <p className="text-center text-sm text-[var(--muted-foreground)] mb-4">
+                Demo sin scoring a {familiarization.level_db} dB HL. {familiarization.show_list ? 'Palabra visible al paciente.' : 'Palabra oculta.'}
+              </p>
+              {familiarization.show_list && stimRef.current[famIndex] && (
+                <div className="text-center text-3xl font-mono font-bold mb-4">{stimRef.current[famIndex].token}</div>
+              )}
+              <div className="flex gap-3 justify-center">
+                <Button size="lg" onClick={playFamiliarization} disabled={famPlaying}>
+                  <Play className="w-4 h-4" /> {famPlaying ? 'Reproduciendo...' : 'Reproducir'}
+                </Button>
+                <Button size="lg" variant="outline" onClick={handleFamNext} disabled={famPlaying}>
+                  Siguiente
+                </Button>
+                <Button size="lg" variant="ghost" onClick={handleSkipFamiliarization}>
+                  Omitir familiarización → Test
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {phase === 'test' && !state.finished && (
           <Card className="mb-6 border-2 border-[var(--primary)]/20">
             <div className="h-1 bg-[var(--primary)]" />
             <CardContent className="p-8">
@@ -315,6 +412,13 @@ export function SRTRun({ session, template, patient, params }: Props) {
         )}
 
         {showHelp && <ShortcutsOverlay onClose={() => setShowHelp(false)} />}
+        {showInstructions && cfg.patient_instructions_md && (
+          <PatientInstructionsModal
+            instructions_md={cfg.patient_instructions_md}
+            onStart={() => setShowInstructions(false)}
+            onClose={() => setShowInstructions(false)}
+          />
+        )}
       </div>
     </div>
   )

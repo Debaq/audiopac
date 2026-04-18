@@ -16,6 +16,36 @@ const INDEX = resolve(ASSETS, 'index.json')
 
 const pad = n => String(n).padStart(2, '0')
 
+const COMMON_REFS = [
+  {
+    citation: 'Aubanel V, García Lecumberri ML, Cooke M. The Sharvard Corpus: A phonemically-balanced Spanish sentence resource for audiology',
+    year: 2014,
+    doi: '10.3109/14992027.2014.907507',
+  },
+  {
+    citation: 'Nilsson M, Soli SD, Sullivan JA. Development of the Hearing in Noise Test',
+    year: 1994,
+  },
+  {
+    citation: 'Soli SD, Wong LL. Assessment of speech intelligibility in noise with the Hearing in Noise Test. Int J Audiol 47(6):356-361',
+    year: 2008,
+  },
+  {
+    citation: 'Hall JW III. Introduction to Audiology Today. Pearson. (Caps. sobre speech-in-noise testing y test-retest)',
+    year: 2014,
+  },
+]
+
+const purposeMd = (lid) => `Cuantificar el **SRT-SNR** con la **lista L${lid}** del corpus **Sharvard ES** (Aubanel et al. 2014), fonémicamente equivalente a las otras 69 listas (±1 dB test-retest). Uso clínico: evaluación longitudinal sin efecto aprendizaje, comparación pre/post audífono o implante, estudios multicéntricos con normativos publicados.`
+
+const howItWorksMd = (lid) => `Paradigma HINT adaptativo (Nilsson 1994) con bracketing Hughson-Westlake modificado:\n\n- **Lista L${lid}**: 10 frases Sharvard, 5 palabras clave por frase (50 keywords totales).\n- Ruido rosa 60 dB SPL continuo binaural.\n- SNR inicial **+5 dB**, step-down **4 dB** tras pasar, step-up **2 dB** tras fallar.\n- Criterio de paso: ≥50% keywords correctas por nivel (≥2/5 por frase promediadas sobre 4 frases).\n- Convergencia típica en 15–20 frases; máx 30 trials.\n\nLas listas son intercambiables: L${lid} es estadísticamente equivalente a cualquier otra (L01..L70) sobre un mismo paciente, lo que permite promediar SRT entre varias listas o alternar en re-tests.`
+
+const protocolMd = (lid) => `1. **Instalación previa** (una sola vez):\n   - Desde \`/catalogos\`: catálogo **Sharvard ES** (texto + keywords para las 70 listas).\n   - Descargar pack de audio: voz F (femenina) o M (masculina) — release \`sharvard-audio-v1\`, ~130 MB c/u.\n   - Verificar los 700 WAV procesados en \`stimuli/\` con RMS normalizado a −20 dBFS.\n2. **Calibración** SPL vigente; idealmente calibración del ruido rosa por separado.\n3. Auriculares supraaurales (validado con Sennheiser HDA200 o equivalentes).\n4. Instrucción al paciente: *«Va a escuchar frases sobre un ruido de fondo. Repita cada frase completa. Si solo entendió algunas palabras, **dígamelas igual** — no se quede callado»*.\n5. 2 frases de práctica a SNR +10 dB con otra lista (p.ej. L${lid === '01' ? '02' : '01'}) para evitar aprender L${lid} antes del test real.\n6. Test: 10–30 frases adaptativas en **L${lid}**.\n7. Reportar **SRT-SNR en dB** + desvío típico de los últimos 6 trials.\n8. Para test-retest/seguimiento, usar una lista distinta (nunca repetir L${lid} en la misma semana — genera sesgo de memoria). Criterio clínico: Δ ≥ 2 dB entre mediciones es significativo.`
+
+const targetPopulationMd = `- **Adultos hispanohablantes** (ideal peninsular, aceptable LatAm con advertencia dialectal).\n- Evaluación de beneficio audioprotésico (pre/post adaptación).\n- Pre/post implante coclear.\n- Seguimiento longitudinal con listas equivalentes.\n- Investigación clínica con normativos publicados.\n- Comparación multicéntrica.`
+
+const contraindicationsMd = `- **Catálogo Sharvard o pack de audio no instalados** (el test falla si faltan los WAV).\n- Hipoacusia profunda (>70 dB HL PTA) — piso del SNR no alcanza inteligibilidad.\n- Hablantes de variantes muy distintas al castellano (portugués, gallego, catalán monolingüe).\n- Niños: corpus validado en adultos 18+ únicamente.`
+
 const tests = []
 for (let i = 1; i <= 70; i++) {
   const lid = pad(i)
@@ -43,12 +73,21 @@ for (let i = 1; i <= 70; i++) {
       },
     },
     is_standard: 1,
+    family: 'hint',
+    purpose_md: purposeMd(lid),
+    how_it_works_md: howItWorksMd(lid),
+    protocol_md: protocolMd(lid),
+    target_population_md: targetPopulationMd,
+    contraindications_md: contraindicationsMd,
+    estimated_duration_min: 8,
+    min_age_years: 18,
+    references: COMMON_REFS,
   })
 }
 
 const manifest = {
   id: 'hint-es-clinico-v1',
-  version: '1.0.0',
+  version: '1.2.0',
   name: 'HINT-ES Clínico (Sharvard L01-L70)',
   category: 'hint',
   description_md: `# HINT-ES Clínico (Sharvard 70 listas)\n\nBateria completa de HINT adaptativo en ruido con el corpus **Sharvard ES peninsular** (Aubanel et al. 2014): 70 listas × 10 frases fonémicamente balanceadas, 5 palabras clave por frase. Un test por lista (L01-L70) para evaluación longitudinal, test-retest en sesiones distintas y evitar efecto aprendizaje.\n\n## Diferencia con \`sharvard-es-v1\`\n\n- \`sharvard-es-v1\`: solo lista L01 como template a clonar (simple).\n- \`hint-es-clinico-v1\`: **70 tests predefinidos**, elegís en \`/tests\` la lista directamente sin clonar.\n\n## Requerimientos\n\n1. Instalar catálogo **Sharvard ES** desde \`/catalogos\` (texto 70 listas)\n2. Descargar pack audio (voz F o M, ~130 MB) del mismo catálogo\n3. Instalar este pack\n\n## Procedimiento\n\n- Voz + ruido rosa, SRT adaptativo por bracketing\n- 4 frases por nivel de SNR, pass si ≥50% keywords correctas\n- Step_down 4 dB tras pasar, step_up 2 dB tras fallar\n- Máx 30 trials por test\n\n## Interpretación\n\nSRT-SNR típico en adultos jóvenes normoyentes: **-5 a -8 dB**. Umbrales >0 dB indican dificultad clínica para extraer habla en ruido (hipoacusia coclear, presbiacusia, déficit central). Alternar listas en re-tests para neutralizar efecto aprendizaje.`,

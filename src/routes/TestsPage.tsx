@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
-import { Plus, Settings2, ArrowUpDown, ChevronRight, ChevronDown, FolderOpen, Package as PackageIcon, User as UserIcon } from 'lucide-react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import { Plus, Settings2, ArrowUpDown, ChevronRight, ChevronDown, FolderOpen, Package as PackageIcon, User as UserIcon, PlusCircle, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -46,8 +46,30 @@ function cmp(sort: SortKey): (a: TestTemplateParsed, b: TestTemplateParsed) => n
   }
 }
 
+type EngineKey = 'patterns' | 'srt' | 'dichotic' | 'hint' | 'matrix'
+
+const ENGINES_WITH_EDITOR: ReadonlySet<EngineKey> = new Set(['patterns', 'srt', 'dichotic'])
+
+function detectEngine(cfg: TestTemplateParsed['config']): EngineKey {
+  if (cfg.srt) return 'srt'
+  if (cfg.dichotic_digits) return 'dichotic'
+  if (cfg.hint) return 'hint'
+  if (cfg.matrix) return 'matrix'
+  return 'patterns'
+}
+
+const ENGINES: Array<{ key: EngineKey; label: string; desc: string; enabled: boolean }> = [
+  { key: 'patterns', label: 'Patrones tonales (DPS/PPS/CUSTOM)', desc: 'Secuencias de tonos cortos/largos, memoria temporal, patrones.', enabled: true },
+  { key: 'srt', label: 'Logoaudiometría SRT', desc: 'Umbral de recepción de habla con bracketing adaptativo.', enabled: true },
+  { key: 'dichotic', label: 'Dichotic Digits', desc: 'Dígitos simultáneos por oído, recuerdo libre/dirigido.', enabled: true },
+  { key: 'hint', label: 'HINT / SinB', desc: 'Frases en ruido con SNR adaptativo.', enabled: false },
+  { key: 'matrix', label: 'Matrix 5-AFC', desc: 'Oraciones matriciales con grid 5×10 y SNR adaptativo.', enabled: false },
+]
+
 export function TestsPage() {
+  const navigate = useNavigate()
   const [params, setParams] = useSearchParams()
+  const [engineDialog, setEngineDialog] = useState<{ family?: string } | null>(null)
   const [templates, setTemplates] = useState<TestTemplateParsed[]>([])
   const [treeInfo, setTreeInfo] = useState<Map<number, TemplateTreeInfo>>(new Map())
   const [query, setQuery] = useState('')
@@ -57,6 +79,7 @@ export function TestsPage() {
   const [sort, setSort] = useState<SortKey>('name_asc')
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
+  const [expandedSubs, setExpandedSubs] = useState<Set<string>>(new Set())
   const [packIndex, setPackIndex] = useState<PacksIndexEntry[]>([])
   const [packDialog, setPackDialog] = useState<PacksIndexEntry | null>(null)
 
@@ -125,36 +148,149 @@ export function TestsPage() {
     return [...rows].sort(cmp(sort))
   }, [templates, query, typeFilter, stdFilter, sort])
 
-  const groups = useMemo(() => {
-    if (view === 'flat') return [{ key: 'all', label: `Todos (${filtered.length})`, items: filtered }]
-    const map = new Map<string, { label: string; items: TestTemplateParsed[] }>()
-    const keyFor = (t: TestTemplateParsed) => {
+  type FlatGroup = { kind: 'flat'; key: string; label: string; items: TestTemplateParsed[] }
+  type FamilySubgroup = {
+    key: string
+    family: string | null
+    label: string
+    std: TestTemplateParsed[]
+    custom: TestTemplateParsed[]
+    engine: EngineKey | null
+  }
+  type PackGroup = {
+    kind: 'pack'
+    key: string
+    label: string
+    families: FamilySubgroup[]
+    total: number
+  }
+  type Group = FlatGroup | PackGroup
+
+  const familyOf = (t: TestTemplateParsed): string | null => {
+    const info = treeInfo.get(t.id)
+    if (info?.family) return info.family
+    if (info?.pack_category) return info.pack_category
+    return t.config.family ?? null
+  }
+
+  // family → { packId, packName } derivado de los std (los packs traen la familia en tests_meta).
+  const familyToPack = useMemo(() => {
+    const m = new Map<string, { packId: number; packName: string }>()
+    for (const t of templates) {
       const info = treeInfo.get(t.id)
-      if (!info || !info.pack_id) return { key: '__custom__', label: 'Personalizados' }
-      if (view === 'by_pack') {
-        return { key: `pack_${info.pack_id}`, label: info.pack_name ?? 'Sin pack' }
+      if (info?.pack_id && info.pack_name) {
+        const fam = info.family ?? info.pack_category
+        if (fam && !m.has(fam)) m.set(fam, { packId: info.pack_id, packName: info.pack_name })
       }
-      // by_family
-      const fam = info.family ?? info.pack_category ?? 'Sin familia'
-      return { key: `fam_${fam}`, label: fam }
+    }
+    return m
+  }, [templates, treeInfo])
+
+  // familia → motor (derivado del primer std template con ese family/pack_category)
+  const familyEngine = useMemo(() => {
+    const m = new Map<string, EngineKey>()
+    for (const t of templates) {
+      if (!t.is_standard) continue
+      const info = treeInfo.get(t.id)
+      const fam = info?.family ?? info?.pack_category ?? t.config.family ?? null
+      if (!fam) continue
+      if (!m.has(fam)) m.set(fam, detectEngine(t.config))
+    }
+    return m
+  }, [templates, treeInfo])
+
+  const groups = useMemo<Group[]>(() => {
+    if (view === 'flat') {
+      return [{ kind: 'flat', key: 'all', label: `Todos (${filtered.length})`, items: filtered }]
+    }
+    if (view === 'by_pack') {
+      const map = new Map<string, { label: string; items: TestTemplateParsed[] }>()
+      for (const t of filtered) {
+        const info = treeInfo.get(t.id)
+        const key = info?.pack_id ? `pack_${info.pack_id}` : '__custom__'
+        const label = info?.pack_id ? (info.pack_name ?? 'Sin pack') : 'Personalizados'
+        const g = map.get(key) ?? { label, items: [] }
+        g.items.push(t)
+        map.set(key, g)
+      }
+      return [...map.entries()]
+        .map<FlatGroup>(([key, g]) => ({ kind: 'flat', key, label: `${g.label} (${g.items.length})`, items: g.items }))
+        .sort((a, b) => {
+          if (a.key === '__custom__') return 1
+          if (b.key === '__custom__') return -1
+          return a.label.localeCompare(b.label)
+        })
+    }
+    // by_family — Pack > Familia > tests + subcarpeta Personalizados con "+ Crear nuevo".
+    const packs = new Map<string, PackGroup>()
+    const ensurePack = (key: string, label: string): PackGroup => {
+      let g = packs.get(key)
+      if (!g) { g = { kind: 'pack', key, label, families: [], total: 0 }; packs.set(key, g) }
+      return g
+    }
+    const ensureFamily = (pack: PackGroup, fam: string | null): FamilySubgroup => {
+      const fkey = fam ?? '__none__'
+      let f = pack.families.find(x => x.key === fkey)
+      if (!f) {
+        f = { key: fkey, family: fam, label: fam ?? 'Sin familia', std: [], custom: [], engine: null }
+        pack.families.push(f)
+      }
+      return f
+    }
+    const familyLabels = new Map<string, string>()
+    for (const t of templates) {
+      const info = treeInfo.get(t.id)
+      if (info?.family && info.family_label) familyLabels.set(info.family, info.family_label)
     }
     for (const t of filtered) {
-      const { key, label } = keyFor(t)
-      const g = map.get(key) ?? { label, items: [] }
-      g.items.push(t)
-      map.set(key, g)
+      const info = treeInfo.get(t.id)
+      const fam = familyOf(t)
+      let packKey: string
+      let packLabel: string
+      if (info?.pack_id) {
+        packKey = `pack_${info.pack_id}`
+        packLabel = info.pack_name ?? 'Sin pack'
+      } else if (fam && familyToPack.has(fam)) {
+        const ref = familyToPack.get(fam)!
+        packKey = `pack_${ref.packId}`
+        packLabel = ref.packName
+      } else {
+        packKey = '__custom__'
+        packLabel = 'Personalizados'
+      }
+      const pack = ensurePack(packKey, packLabel)
+      const family = ensureFamily(pack, fam)
+      if (fam && familyLabels.has(fam)) family.label = familyLabels.get(fam)!
+      if (t.is_standard) family.std.push(t)
+      else family.custom.push(t)
+      if (family.engine == null) family.engine = detectEngine(t.config)
+      pack.total++
     }
-    return [...map.entries()]
-      .map(([key, g]) => ({ key, label: `${g.label} (${g.items.length})`, items: g.items }))
-      .sort((a, b) => {
-        if (a.key === '__custom__') return 1
-        if (b.key === '__custom__') return -1
+    for (const p of packs.values()) {
+      p.families.sort((a, b) => {
+        if (a.key === '__none__') return 1
+        if (b.key === '__none__') return -1
         return a.label.localeCompare(b.label)
       })
-  }, [filtered, view, treeInfo])
+    }
+    return [...packs.values()].sort((a, b) => {
+      if (a.key === '__custom__') return 1
+      if (b.key === '__custom__') return -1
+      return a.label.localeCompare(b.label)
+    })
+  }, [filtered, view, treeInfo, familyToPack])
 
   const toggleGroup = (k: string) => {
     setCollapsed(prev => {
+      const n = new Set(prev)
+      if (n.has(k)) n.delete(k)
+      else n.add(k)
+      return n
+    })
+  }
+
+  const toggleSub = (k: string) => {
+    setExpandedSubs(prev => {
       const n = new Set(prev)
       if (n.has(k)) n.delete(k)
       else n.add(k)
@@ -182,10 +318,28 @@ export function TestsPage() {
   }
 
   const GroupIcon = ({ k }: { k: string }) => {
-    if (k === '__custom__') return <UserIcon className="w-3.5 h-3.5" />
+    if (k === '__custom__' || k === '__nofamily__') return <UserIcon className="w-3.5 h-3.5" />
     if (view === 'by_pack') return <PackageIcon className="w-3.5 h-3.5" />
     return <FolderOpen className="w-3.5 h-3.5" />
   }
+
+  const TemplateRow = ({ t }: { t: TestTemplateParsed }) => (
+    <li>
+      <button
+        onClick={() => selectTemplate(t.id)}
+        className={cn(
+          'w-full text-left px-2 py-1.5 rounded text-sm flex items-center gap-2',
+          selectedId === t.id
+            ? 'bg-[var(--primary)]/15 text-[var(--primary)]'
+            : 'hover:bg-[var(--secondary)]',
+        )}
+      >
+        <Settings2 className="w-3.5 h-3.5 shrink-0 opacity-70" />
+        <span className="flex-1 min-w-0 truncate">{t.name}</span>
+        <span className="text-[9px] font-mono text-[var(--muted-foreground)] shrink-0">{t.test_type}</span>
+      </button>
+    </li>
+  )
 
   return (
     <div className="p-6 max-w-[1400px] mx-auto">
@@ -196,9 +350,7 @@ export function TestsPage() {
             {filtered.length} {filtered.length === templates.length ? '' : `de ${templates.length}`} configuraciones
           </p>
         </div>
-        <Link to="/tests/nuevo">
-          <Button><Plus className="w-4 h-4" /> Nuevo test</Button>
-        </Link>
+        <Button onClick={() => setEngineDialog({})}><Plus className="w-4 h-4" /> Nuevo test</Button>
       </div>
 
       <div className="mb-4 space-y-3">
@@ -239,40 +391,95 @@ export function TestsPage() {
           <aside className="bg-[var(--card)] border border-[var(--border)] rounded-lg p-2 overflow-y-auto max-h-[78vh]">
             {groups.map(g => {
               const isCollapsed = collapsed.has(g.key)
+              if (g.kind === 'flat') {
+                return (
+                  <div key={g.key} className="mb-1">
+                    {view !== 'flat' && (
+                      <button
+                        onClick={() => toggleGroup(g.key)}
+                        className="w-full flex items-center gap-1.5 px-2 py-1.5 text-xs font-semibold text-[var(--foreground)]/80 hover:bg-[var(--secondary)] rounded"
+                      >
+                        {isCollapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                        <GroupIcon k={g.key} />
+                        <span className="truncate">{g.label}</span>
+                      </button>
+                    )}
+                    {!isCollapsed && (
+                      <ul className={view !== 'flat' ? 'pl-4 mt-0.5 space-y-0.5' : 'space-y-0.5'}>
+                        {g.items.map(t => <TemplateRow key={t.id} t={t} />)}
+                      </ul>
+                    )}
+                  </div>
+                )
+              }
+              // pack group con familias anidadas
               return (
                 <div key={g.key} className="mb-1">
-                  {view !== 'flat' && (
-                    <button
-                      onClick={() => toggleGroup(g.key)}
-                      className="w-full flex items-center gap-1.5 px-2 py-1.5 text-xs font-semibold text-[var(--foreground)]/80 hover:bg-[var(--secondary)] rounded"
-                    >
-                      {isCollapsed
-                        ? <ChevronRight className="w-3.5 h-3.5" />
-                        : <ChevronDown className="w-3.5 h-3.5" />}
-                      <GroupIcon k={g.key} />
-                      <span className="truncate">{g.label}</span>
-                    </button>
-                  )}
+                  <button
+                    onClick={() => toggleGroup(g.key)}
+                    className="w-full flex items-center gap-1.5 px-2 py-1.5 text-xs font-semibold text-[var(--foreground)]/80 hover:bg-[var(--secondary)] rounded"
+                  >
+                    {isCollapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                    <PackageIcon className="w-3.5 h-3.5" />
+                    <span className="truncate">{g.label} ({g.total})</span>
+                  </button>
                   {!isCollapsed && (
-                    <ul className={view !== 'flat' ? 'pl-4 mt-0.5 space-y-0.5' : 'space-y-0.5'}>
-                      {g.items.map(t => (
-                        <li key={t.id}>
-                          <button
-                            onClick={() => selectTemplate(t.id)}
-                            className={cn(
-                              'w-full text-left px-2 py-1.5 rounded text-sm flex items-center gap-2',
-                              selectedId === t.id
-                                ? 'bg-[var(--primary)]/15 text-[var(--primary)]'
-                                : 'hover:bg-[var(--secondary)]',
+                    <div className="pl-4 mt-0.5 space-y-1">
+                      {g.families.map(f => {
+                        const famKey = `${g.key}__fam_${f.key}`
+                        const famCollapsed = !expandedSubs.has(famKey)
+                        const customKey = `${famKey}__custom`
+                        const customCollapsed = !expandedSubs.has(customKey)
+                        const famTotal = f.std.length + f.custom.length
+                        return (
+                          <div key={f.key}>
+                            <button
+                              onClick={() => toggleSub(famKey)}
+                              className="w-full flex items-center gap-1.5 px-2 py-1 text-[11px] font-medium text-[var(--foreground)]/70 hover:bg-[var(--secondary)] rounded"
+                            >
+                              {famCollapsed ? <ChevronRight className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                              <FolderOpen className="w-3 h-3" />
+                              <span className="truncate">{f.label} ({famTotal})</span>
+                            </button>
+                            {!famCollapsed && (
+                              <div className="pl-4 mt-0.5">
+                                <ul className="space-y-0.5">
+                                  {f.std.map(t => <TemplateRow key={t.id} t={t} />)}
+                                </ul>
+                                <button
+                                  onClick={() => toggleSub(customKey)}
+                                  className="w-full flex items-center gap-1.5 px-2 py-1 mt-1 text-[10px] font-medium text-[var(--muted-foreground)] hover:bg-[var(--secondary)] rounded"
+                                >
+                                  {customCollapsed ? <ChevronRight className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                                  <UserIcon className="w-3 h-3" />
+                                  <span className="truncate">Personalizados ({f.custom.length})</span>
+                                </button>
+                                {!customCollapsed && (
+                                  <ul className="pl-4 mt-0.5 space-y-0.5">
+                                    {f.custom.map(t => <TemplateRow key={t.id} t={t} />)}
+                                    {(() => {
+                                      const famEng = f.engine ?? (f.family ? familyEngine.get(f.family) ?? null : null)
+                                      if (famEng && !ENGINES_WITH_EDITOR.has(famEng)) return null
+                                      return (
+                                        <li>
+                                          <button
+                                            onClick={() => setEngineDialog({ family: f.family ?? undefined })}
+                                            className="w-full text-left px-2 py-1.5 rounded text-sm flex items-center gap-2 text-[var(--primary)] hover:bg-[var(--primary)]/10"
+                                          >
+                                            <PlusCircle className="w-3.5 h-3.5 shrink-0" />
+                                            <span className="flex-1 min-w-0 truncate">Crear nuevo</span>
+                                          </button>
+                                        </li>
+                                      )
+                                    })()}
+                                  </ul>
+                                )}
+                              </div>
                             )}
-                          >
-                            <Settings2 className="w-3.5 h-3.5 shrink-0 opacity-70" />
-                            <span className="flex-1 min-w-0 truncate">{t.name}</span>
-                            <span className="text-[9px] font-mono text-[var(--muted-foreground)] shrink-0">{t.test_type}</span>
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
+                          </div>
+                        )
+                      })}
+                    </div>
                   )}
                 </div>
               )
@@ -292,6 +499,61 @@ export function TestsPage() {
               </div>
             )}
           </section>
+        </div>
+      )}
+
+      {engineDialog && (
+        <div
+          className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
+          onClick={() => setEngineDialog(null)}
+        >
+          <div
+            className="bg-[var(--card)] border border-[var(--border)] rounded-lg max-w-lg w-full p-5 shadow-xl"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-1">
+              <h2 className="text-lg font-bold">Elegí motor del test</h2>
+              <button
+                onClick={() => setEngineDialog(null)}
+                className="p-1 rounded hover:bg-[var(--secondary)]"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <p className="text-sm text-[var(--muted-foreground)] mb-4">
+              Cada motor define el paradigma de evaluación. Hoy solo el editor de patrones tonales está disponible; los otros motores se usan vía packs estándar.
+            </p>
+            <div className="space-y-2">
+              {ENGINES.map(e => (
+                <button
+                  key={e.key}
+                  disabled={!e.enabled}
+                  onClick={() => {
+                    if (!e.enabled) return
+                    const qs = new URLSearchParams()
+                    qs.set('engine', e.key)
+                    if (engineDialog.family) qs.set('family', engineDialog.family)
+                    navigate(`/tests/nuevo?${qs.toString()}`)
+                    setEngineDialog(null)
+                  }}
+                  className={cn(
+                    'w-full text-left p-3 rounded-lg border transition-colors',
+                    e.enabled
+                      ? 'border-[var(--border)] hover:border-[var(--primary)] hover:bg-[var(--primary)]/5 cursor-pointer'
+                      : 'border-[var(--border)] opacity-50 cursor-not-allowed',
+                  )}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-medium text-sm">{e.label}</span>
+                    {!e.enabled && (
+                      <Badge variant="outline" className="text-[10px]">Próximamente</Badge>
+                    )}
+                  </div>
+                  <p className="text-xs text-[var(--muted-foreground)] mt-0.5">{e.desc}</p>
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       )}
 
