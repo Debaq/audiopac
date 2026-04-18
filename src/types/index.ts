@@ -57,6 +57,18 @@ export interface ToneDefinition {
   phase_invert_right?: boolean
 }
 
+export interface SRTParams {
+  stimulus_list_code: string
+  start_level_db: number
+  words_per_level: number
+  step_down_db: number
+  step_up_db: number
+  min_level_db: number
+  max_level_db: number
+  threshold_pass_ratio: number
+  max_total_trials?: number
+}
+
 export interface TestConfig {
   frequency?: number
   tones: Record<string, ToneDefinition>
@@ -69,6 +81,7 @@ export interface TestConfig {
   test_sequences: string[]
   channel: Ear
   level_db: number
+  srt?: SRTParams
 }
 
 export interface TestTemplate {

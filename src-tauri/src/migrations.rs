@@ -68,5 +68,11 @@ pub fn get_migrations() -> Vec<Migration> {
             sql: include_str!("../migrations/012_stimuli.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 13,
+            description: "seed_srt",
+            sql: include_str!("../migrations/013_seed_srt.sql"),
+            kind: MigrationKind::Up,
+        },
     ]
 }

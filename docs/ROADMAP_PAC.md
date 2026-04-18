@@ -114,7 +114,7 @@ Objetivo: que los dB reportados sean dB SPL reales, no pseudo-calibrados.
 
 ## 4. Plan por fases
 
-### Fase 1 — Grabación + logoaudiometría básica ✅ parcial (migración 012)
+### Fase 1 — Grabación + logoaudiometría básica ✅ hecho (migraciones 012 + 013)
 - ✅ Schema `stimulus_lists` + `stimuli` (tokens con audio opcional, file_path, métricas RMS/peak/duración/sample_rate, normalized flag)
 - ✅ Setting global `country_code` (LATAM, US, + 19 países) con filtrado de listas por país en UI
 - ✅ Listas seed LatAm neutras (SRT bisílabos, Discriminación monosílabos, Dichotic Digits ES) + SRT US-ES
@@ -123,7 +123,7 @@ Objetivo: que los dB reportados sean dB SPL reales, no pseudo-calibrados.
 - ✅ Procesado automático: resample mono 44.1 kHz, HP 80 Hz (`OfflineAudioContext` + biquad), trim por RMS ventana 20 ms (umbral −45 dBFS), fade 10 ms, normalización RMS a −20 dBFS con clamp anti-clip 0.99
 - ✅ Export a WAV PCM 16-bit mono. Almacenamiento en `appDataDir/stimuli/list{id}_{pos}_{token}.wav` vía `@tauri-apps/plugin-fs`
 - ✅ Motor: `playStimulusBuffer(buffer, level_db, {rms_dbfs, ear})` mapea SPL usando curva activa a 1 kHz. Cache de buffers decodificados
-- ⚠️ Pendiente: plantilla logoaudiometría simple (SRT runner). Requiere flow adaptativo de nivel + scoring por palabra (siguiente paso)
+- ✅ SRT runner adaptativo (mig 013). Método descendente-ascendente con bracketing: start level configurable, N palabras por nivel, ≥ratio para pasar → desciende `step_down_db`, <ratio → asciende `step_up_db`. SRT = mínimo nivel con pass que tiene fail por debajo. Stop por bracketing / floor / ceiling / max trials / manual. Templates seed: `SRT_LATAM_BISIL`, `SRT_US_ES_BISIL`. Detección automática por `config.srt` en `EvaluationRunPage` → delega a `<SRTRun>`
 - ⚠️ Pendiente: denoise espectral (queda para Fase 4)
 
 ### Fase 2 — Calibración global ✅ hecho (migraciones 006 + 010)

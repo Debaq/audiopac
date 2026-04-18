@@ -11,6 +11,7 @@ import { getPatient } from '@/lib/db/patients'
 import { TestRunner, type RunnerState } from '@/lib/audio/runner'
 import { ensureRunning, type CalibCurvePoint } from '@/lib/audio/engine'
 import { useKeyboard, Kbd } from '@/hooks/useKeyboard'
+import { SRTRun } from '@/components/SRTRun'
 import type { TestSession, TestTemplateParsed, Patient } from '@/types'
 import { percent, cn } from '@/lib/utils'
 
@@ -41,6 +42,7 @@ export function EvaluationRunPage() {
       const [t, p] = await Promise.all([getTemplate(s.template_id), getPatient(s.patient_id)])
       setTemplate(t)
       setPatient(p)
+      if (t?.config.srt) return
       if (t) {
         let curve: CalibCurvePoint[] | undefined
         if (s.calibration_curve_snapshot) {
@@ -150,7 +152,15 @@ export function EvaluationRunPage() {
     { keys: ['Escape'], handler: () => setShowHelp(false) },
   ], [current, state, template])
 
-  if (!session || !template || !patient || !state) {
+  if (!session || !template || !patient) {
+    return <div className="p-8">Cargando evaluación...</div>
+  }
+
+  if (template.config.srt) {
+    return <SRTRun session={session} template={template} patient={patient} params={template.config.srt} />
+  }
+
+  if (!state) {
     return <div className="p-8">Cargando evaluación...</div>
   }
 

@@ -198,6 +198,21 @@ export function EvaluationHomePage() {
 }
 
 function TemplateSummary({ config }: { config: import('@/types').TestConfig }) {
+  if (config.srt) {
+    const s = config.srt
+    return (
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-sm">
+        <div><span className="text-[var(--muted-foreground)]">Modo:</span> SRT adaptativo</div>
+        <div><span className="text-[var(--muted-foreground)]">Lista:</span> {s.stimulus_list_code}</div>
+        <div><span className="text-[var(--muted-foreground)]">Nivel inicial:</span> {s.start_level_db} dB HL</div>
+        <div><span className="text-[var(--muted-foreground)]">Palabras/nivel:</span> {s.words_per_level}</div>
+        <div><span className="text-[var(--muted-foreground)]">Descenso:</span> {s.step_down_db} dB</div>
+        <div><span className="text-[var(--muted-foreground)]">Ascenso:</span> {s.step_up_db} dB</div>
+        <div><span className="text-[var(--muted-foreground)]">Umbral pase:</span> {Math.round(s.threshold_pass_ratio * 100)}%</div>
+        <div><span className="text-[var(--muted-foreground)]">Rango:</span> {s.min_level_db}–{s.max_level_db} dB</div>
+      </div>
+    )
+  }
   return (
     <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-sm">
       <div><span className="text-[var(--muted-foreground)]">Longitud patrón:</span> {config.pattern_length} tonos</div>

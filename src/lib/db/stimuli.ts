@@ -22,6 +22,12 @@ export async function getStimulusList(id: number): Promise<StimulusList | null> 
   return rows[0] ?? null
 }
 
+export async function getStimulusListByCode(code: string): Promise<StimulusList | null> {
+  const db = await getDb()
+  const rows = await db.select<StimulusList[]>('SELECT * FROM stimulus_lists WHERE code = $1', [code])
+  return rows[0] ?? null
+}
+
 export async function createStimulusList(input: {
   code: string
   name: string
