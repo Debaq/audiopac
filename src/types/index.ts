@@ -95,6 +95,7 @@ export interface TestConfig {
   srt?: SRTParams
   dichotic_digits?: DichoticDigitsParams
   hint?: HINTParams
+  matrix?: MatrixParams
 }
 
 export interface TestTemplate {
@@ -165,7 +166,7 @@ export interface SessionWithDetails extends TestSession {
   profile_name: string
 }
 
-export type StimulusCategory = 'srt' | 'discrimination' | 'dichotic_digits' | 'sentence' | 'custom'
+export type StimulusCategory = 'srt' | 'discrimination' | 'dichotic_digits' | 'sentence' | 'matrix' | 'custom'
 
 export interface StimulusList {
   id: number
@@ -211,6 +212,25 @@ export interface HINTParams {
   /** Ratio de keywords correctos para pasar ≥ threshold. */
   threshold_pass_ratio: number
   /** Pasos SNR. */
+  step_down_db: number
+  step_up_db: number
+  min_snr_db: number
+  max_snr_db: number
+  max_total_trials?: number
+}
+
+export interface MatrixParams {
+  /** Lista con las 50 palabras (columns × 10). Cada stimulus lleva metadata.column (0..columns-1). */
+  stimulus_list_code: string
+  columns: number
+  start_snr_db: number
+  noise_level_db: number
+  noise_type: NoiseType
+  /** Gap entre palabras dentro de una frase, en ms. */
+  inter_word_gap_ms: number
+  sentences_per_level: number
+  /** Ratio de palabras correctas para pasar. p.ej. 0.6 = 3/5. */
+  threshold_pass_ratio: number
   step_down_db: number
   step_up_db: number
   min_snr_db: number

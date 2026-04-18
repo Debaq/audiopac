@@ -14,6 +14,7 @@ import { useKeyboard, Kbd } from '@/hooks/useKeyboard'
 import { SRTRun } from '@/components/SRTRun'
 import { DichoticDigitsRun } from '@/components/DichoticDigitsRun'
 import { HINTRun } from '@/components/HINTRun'
+import { MatrixRun } from '@/components/MatrixRun'
 import type { TestSession, TestTemplateParsed, Patient } from '@/types'
 import { percent, cn } from '@/lib/utils'
 
@@ -47,6 +48,7 @@ export function EvaluationRunPage() {
       if (t?.config.srt) return
       if (t?.config.dichotic_digits) return
       if (t?.config.hint) return
+      if (t?.config.matrix) return
       if (t) {
         let curve: CalibCurvePoint[] | undefined
         if (s.calibration_curve_snapshot) {
@@ -170,6 +172,10 @@ export function EvaluationRunPage() {
 
   if (template.config.hint) {
     return <HINTRun session={session} template={template} patient={patient} params={template.config.hint} />
+  }
+
+  if (template.config.matrix) {
+    return <MatrixRun session={session} template={template} patient={patient} params={template.config.matrix} />
   }
 
   if (!state) {

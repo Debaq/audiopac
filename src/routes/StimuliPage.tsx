@@ -33,6 +33,7 @@ const CATEGORIES: { value: StimulusCategory; label: string }[] = [
   { value: 'discrimination', label: 'Discriminación' },
   { value: 'dichotic_digits', label: 'Dichotic Digits' },
   { value: 'sentence', label: 'Oraciones' },
+  { value: 'matrix', label: 'Matrix (5 columnas)' },
   { value: 'custom', label: 'Personalizada' },
 ]
 

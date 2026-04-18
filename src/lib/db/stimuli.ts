@@ -117,6 +117,16 @@ export async function updateStimulusKeywords(id: number, keywords: string[] | nu
   )
 }
 
+export function parseStimMetadata(s: Stimulus): Record<string, unknown> {
+  if (!s.metadata_json) return {}
+  try {
+    const v = JSON.parse(s.metadata_json)
+    return v && typeof v === 'object' ? v as Record<string, unknown> : {}
+  } catch {
+    return {}
+  }
+}
+
 export function parseKeywords(s: Stimulus): string[] {
   if (!s.keywords_json) return []
   try {

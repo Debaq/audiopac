@@ -637,6 +637,99 @@ export async function playStimulusPair(
   }
 }
 
+/**
+ * Reproduce una secuencia de N buffers concatenados en serie, con separación `gap_ms`
+ * entre ellos, todos al mismo level_db SPL. Opcionalmente con ruido continuo enmascarante
+ * (para Matrix sentence test). `rms_dbfs_per_buffer` permite compensar RMS por palabra.
+ * Onend dispara al terminar el último buffer.
+ */
+export async function playStimulusSequenceWithNoise(
+  buffers: AudioBuffer[],
+  level_db: number,
+  opts: {
+    ear?: Ear
+    rms_dbfs?: number | null
+    refDb?: number
+    gap_ms?: number
+    noise?: { level_db: number; type: NoiseType } | null
+    onEnd?: () => void
+  } = {},
+): Promise<() => void> {
+  if (buffers.length === 0) throw new Error('playStimulusSequenceWithNoise: buffers vacío')
+  const ctx = await ensureRunning()
+  const ear = opts.ear ?? 'binaural'
+  const rms = opts.rms_dbfs ?? -20
+  const ref = opts.refDb ?? resolveRefDb(1000, ear)
+  const voiceGain = dbToGain(level_db - rms, ref)
+  const gapSec = Math.max(0, opts.gap_ms ?? 80) / 1000
+
+  const merger = ctx.createChannelMerger(2)
+  const { l, r } = earGains(ear)
+  const vL = ctx.createGain(); vL.gain.value = l
+  const vR = ctx.createGain(); vR.gain.value = r
+  vL.connect(merger, 0, 0); vR.connect(merger, 0, 1)
+  merger.connect(ctx.destination)
+
+  const startAt = ctx.currentTime + 0.05
+  const leadIn = opts.noise ? 0.2 : 0
+  const t0 = startAt + leadIn
+
+  const sources: AudioBufferSourceNode[] = []
+  let cursor = t0
+  for (const buf of buffers) {
+    const src = ctx.createBufferSource()
+    src.buffer = buf
+    const g = ctx.createGain()
+    g.gain.value = voiceGain
+    src.connect(g)
+    g.connect(vL); g.connect(vR)
+    src.start(cursor)
+    sources.push(src)
+    cursor += buf.duration + gapSec
+  }
+  const tVoiceEnd = cursor - gapSec
+  sources[sources.length - 1].onended = () => opts.onEnd?.()
+
+  let srcN: AudioBufferSourceNode | null = null
+  if (opts.noise) {
+    const n = opts.noise
+    const noiseRmsDbfs = n.type === 'ssn' ? -20 : n.type === 'pink' ? -15 : -5
+    const noiseGain = dbToGain(n.level_db - noiseRmsDbfs, ref)
+    const noiseBuf = (n.type === 'pink' || n.type === 'ssn') ? getPinkNoiseBuffer(ctx) : getWhiteNoiseBuffer(ctx)
+    srcN = ctx.createBufferSource()
+    srcN.buffer = noiseBuf
+    srcN.loop = true
+    const gN = ctx.createGain()
+    const nL = ctx.createGain(); nL.gain.value = l
+    const nR = ctx.createGain(); nR.gain.value = r
+    let head: AudioNode = srcN
+    if (n.type === 'ssn') {
+      const lp = ctx.createBiquadFilter()
+      lp.type = 'lowpass'
+      lp.frequency.value = 1000
+      lp.Q.value = 0.707
+      srcN.connect(lp)
+      head = lp
+    }
+    head.connect(gN); gN.connect(nL); gN.connect(nR)
+    nL.connect(merger, 0, 0); nR.connect(merger, 0, 1)
+    const tNoiseStart = startAt
+    const tNoiseEnd = tVoiceEnd + leadIn
+    const fade = 0.05
+    gN.gain.setValueAtTime(0, tNoiseStart)
+    gN.gain.linearRampToValueAtTime(noiseGain, tNoiseStart + fade)
+    gN.gain.setValueAtTime(noiseGain, tNoiseEnd - fade)
+    gN.gain.linearRampToValueAtTime(0, tNoiseEnd)
+    srcN.start(tNoiseStart)
+    srcN.stop(tNoiseEnd + 0.02)
+  }
+
+  return () => {
+    for (const s of sources) { try { s.stop() } catch {} }
+    if (srcN) { try { srcN.stop() } catch {} }
+  }
+}
+
 let stimulusBufferCache = new Map<string, AudioBuffer>()
 
 export async function loadStimulusBuffer(absPath: string, bytes: Uint8Array): Promise<AudioBuffer> {

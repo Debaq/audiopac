@@ -159,7 +159,8 @@ Objetivo: que los dB reportados sean dB SPL reales, no pseudo-calibrados.
 - ✅ **PALPA-E** (pack `palpa-es-v1`). 40 palabras → 20 pares mínimos consonánticos (oclusivas sordas/sonoras, fricativas, nasales, laterales, vibrantes), categoría `discrimination`. Texto-only `requirements:'recording'`. Norma `accuracy_pct` ≥90% adulto sano. Referencias Kay/Lesser/Coltheart 1992 + Valle/Cuetos 1995.
 - ✅ **Dichotic Digits ES** (migración 014). Plantillas `DD_ES_FREE` (recuerdo libre) y `DD_ES_DIRECTED` (recuerdo dirigido alternando oído inicial). Usa `playStimulusPair` en `engine.ts` para disparar dos `AudioBuffer` simultáneos con mismo `startTime` (uno por oído). Lista `DICHOTIC_DIGITS_ES` (mig 012) con dígitos 1–9 excluyendo "siete". Scoring por oído con asimetría (R − L). Pares configurables (default 20 pares · 2 dígitos/oído · 55 dB HL).
 - ✅ **SinB-ES** (pack `sinb-es-v1`). Variante HINT con ruido **SSN** (Speech-Shaped Noise = rosa filtrado LP 1 kHz Q=0.707, aproxima LTASS habla). Engine: extendido `NoiseType` con `'ssn'`, `playStimulusWithNoise` y `makeNoiseHead` insertan BiquadFilter LP cuando aplica. `noiseRmsDbfs = -20` para SSN. Pack reusa `HINTController` (sin runner nuevo) con `noise_type:'ssn'`. Lista vacía `requirements:'recording'`. Norma `srt_db` por edad (jóvenes -8 a -3, mayores -2 a 8).
-- SSW adaptado (pendiente)
+- ✅ **Matrix-ES** publicado (`matrix-es-v1`). Nuevo runner `MatrixController` con SNR bracketing 5-AFC por columna. `playStimulusSequenceWithNoise` concatena N buffers en serie con ruido continuo. Grid 5×10 clickeable en `MatrixRun.tsx`. Usuario graba 50 palabras con `metadata.column` 0-4.
+- 📝 **SSW adaptado** — diseño en sección 7 del roadmap. Prioridad baja (overlap con Dichotic Digits, validación ES débil).
 
 ### Fase 5 — Ruido (bonus) ✅ parcial (migración 007)
 - ✅ Generador de ruido blanco (buffer random en loop)
@@ -201,6 +202,8 @@ Objetivo: que los dB reportados sean dB SPL reales, no pseudo-calibrados.
 | `sharvard-es-v1` | HINT_SHARVARD_L01 | (referencia a `catalogs/sharvard-es-v1.json`, 70 listas × 10) | audio_pack |
 | `sinb-es-v1` | SINB_ES_CUSTOM | SINB_ES_CUSTOM_A (vacía) | recording |
 | `palpa-es-v1` | — | PALPA_PARES_MIN_ES_A (40 palabras) | recording |
+| `matrix-es-v1` | MATRIX_ES | MATRIX_ES_A (50 palabras, 5 cols × 10) | recording |
+| `hint-es-clinico-v1` | HINT_SHARVARD_L01..L70 (70 tests) | (referencia `catalogs/sharvard-es-v1.json`) | audio_pack |
 
 **Pendiente:**
 
@@ -287,11 +290,11 @@ Ficha muestra: descripción, licencia, referencias, cantidad de tests/listas, ta
 
 #### 6.6 Paquetes pendientes de crear (cuando el sistema esté listo)
 
-- **Matrix-ES** (Hochmuth 2012) — estructura matriz pública (10×5=50 palabras) + runner 5-AFC. Audios cerrados (HörTech) → solo estructura + descripción + flag `requirements: recording`
-- **SSW adaptado** (pendiente diseño)
+- ✅ **Matrix-ES** (Hochmuth 2012) publicado (`matrix-es-v1`). Estructura 5 columnas × 10 palabras. Nuevo runner `MatrixController` (`src/lib/audio/matrixRunner.ts`) con SNR bracketing 5-AFC por columna. UI `MatrixRun.tsx` con grid clickeable 5×10. Engine: `playStimulusSequenceWithNoise` concatena N buffers con gap inter-palabra y ruido continuo. Metadata `column` (0-4) por stimulus asigna a qué columna pertenece. Audios HörTech cerrados → pack solo trae estructura; usuario graba sus 50 palabras.
+- **SSW adaptado** — ver sección 7 (diseño)
 - ✅ **SinB-ES** publicado (`sinb-es-v1`)
 - ✅ **PALPA-E** publicado (`palpa-es-v1`); PAL listas LatAm cubiertas por `logoaud-latam-v1`
-- **HINT-ES clínico** (ya existe texto + audios Sharvard, solo falta reempaquetar como pack v2)
+- ✅ **HINT-ES clínico v2** publicado (`hint-es-clinico-v1`). 70 tests `HINT_SHARVARD_L01..L70` predefinidos apuntando a las listas Sharvard (generado por `scripts/build-hint-es-clinico-pack.mjs`). A diferencia de `sharvard-es-v1` (sólo L01 como template a clonar), este pack expone cada lista como test seleccionable directamente desde `/tests`. `requirements: audio_pack` — requiere catálogo Sharvard ES + pack audio instalados.
 
 #### 6.7 Riesgos y mitigaciones
 
@@ -299,6 +302,78 @@ Ficha muestra: descripción, licencia, referencias, cantidad de tests/listas, ta
 - **Offline bootstrap**: primer arranque sin red → app funcional pero vacía; cachear último `index.json` para mostrar "ya conocés estos packs aunque no podés instalarlos ahora"
 - **Versiones y updates**: diff versión vs instalado → botón "Actualizar" re-INSERT preservando custom de usuario
 - **Conflicto codes**: dos packs que quieren el mismo `code` de test → rechaza segundo install con error claro
+
+---
+
+---
+
+## 7. SSW adaptado ES (diseño preliminar)
+
+**SSW** (Staggered Spondaic Word Test — Katz 1962) evalúa procesamiento auditivo central adulto/pediátrico con **pares spondee dicóticos parcialmente solapados**. Cuatro condiciones por ítem:
+
+```
+   oído →   DERECHO            IZQUIERDO
+   tiempo   [RNC ][  RC  ]
+                   [  LC  ][ LNC ]
+```
+
+- **RNC** (Right Non-Competing): spondee derecho, primer hemispondee aislado
+- **RC** (Right Competing): segundo hemispondee derecho simultáneo con LC izquierdo
+- **LC** (Left Competing): primer hemispondee izquierdo simultáneo con RC
+- **LNC** (Left Non-Competing): segundo hemispondee izquierdo aislado
+
+Ejemplo clásico: derecho = "SUN-up", izquierdo = "dayLIGHT" → "SUN" [RNC] + ("up" || "day") [RC/LC] + "LIGHT" [LNC]. Total 4 palabras por ítem, 40 ítems.
+
+### 7.1 Adaptación ES
+
+Traducir 40 spondees inglés → pares bisílabos ES balanceados fonémicamente. Candidatos: "buen-día", "sol-rey", "luz-mar", "pan-sal"… Usar corpus PAL como pool. Validar solape sintáctico-acústico: cada hemi-spondee debe ser palabra completa reconocible aislada.
+
+### 7.2 Schema
+
+**Nuevo tipo lista**: `StimulusCategory = 'ssw'` o extender `metadata` para marcar rol `hemispondee` + `item_id` (número de par) + `side` ('R'|'L') + `position` (1|2).
+
+**Stimulus**:
+```
+token: "sun"
+metadata: { ssw_item: 1, side: "R", position: 1 }
+```
+
+40 ítems × 2 lados × 2 hemispondees = **160 grabaciones**.
+
+### 7.3 Engine
+
+Reusar `playStimulusPair(bufferL, bufferR, ...)` + offset temporal:
+- Arranque: RNC solo (buffer R, position 1)
+- `t = dur(RNC)`: start RC (R, pos 2) y LC (L, pos 1) simultáneos con `playStimulusPair`
+- `t = dur(RNC) + max(dur(RC), dur(LC))`: LNC solo (buffer L, position 2)
+
+O función nueva `playSSWItem(rnc, rc, lc, lnc, opts)` con scheduling explícito en un AudioContext único.
+
+### 7.4 Runner
+
+`SSWController` con score por condición:
+```ts
+{
+  RNC: { correct: 0..40, total: 40 },
+  RC:  { ... },
+  LC:  { ... },
+  LNC: { ... },
+}
+```
+
+Métrica clínica: **raw score total**, **corrected score** (ajuste por edad), **ear effect** (R-L), **order effect** (RNC+RC vs LC+LNC), **reversals** (confusión secuencial).
+
+### 7.5 UI
+
+`SSWRun.tsx` con 4 inputs de texto (o 4 grids 40-alternatives si cerramos pool) post-trial. Marcar correct/incorrect por palabra. Progreso 40 items.
+
+### 7.6 Pack
+
+`ssw-es-v1.json` `requirements: recording` (usuario graba las 160 palabras). Interpretación: norms_by_age para raw + ear_effect pct.
+
+### 7.7 Prioridad
+
+**Baja** — SSW tiene controversia metodológica (validación cruzada débil en ES) y overlap con Dichotic Digits + HINT. Diferir hasta demanda clínica concreta.
 
 ---
 
