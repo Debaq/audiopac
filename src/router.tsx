@@ -14,6 +14,7 @@ import { SessionReportPage } from '@/routes/SessionReportPage'
 import { CalibrationPage } from '@/routes/CalibrationPage'
 import { StimuliPage } from '@/routes/StimuliPage'
 import { CatalogsPage } from '@/routes/CatalogsPage'
+import { RoadmapPage } from '@/routes/RoadmapPage'
 
 export const router = createBrowserRouter([
   { path: '/', element: <ProfileSelectorPage /> },
@@ -36,6 +37,7 @@ export const router = createBrowserRouter([
           { path: '/calibracion', element: <CalibrationPage /> },
           { path: '/estimulos', element: <StimuliPage /> },
           { path: '/catalogos', element: <CatalogsPage /> },
+          { path: '/roadmap', element: <RoadmapPage /> },
         ],
       },
     ],

@@ -1,5 +1,5 @@
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
-import { Users, Activity, Settings2, FileText, LogOut, Home, AudioLines, Gauge, AlertTriangle, CheckCircle2, Mic, Package, Download } from 'lucide-react'
+import { Users, Activity, Settings2, FileText, LogOut, Home, AudioLines, Gauge, AlertTriangle, CheckCircle2, Mic, Package, Download, Map } from 'lucide-react'
 import { useAuth } from '@/stores/auth'
 import { useCalibrationStore } from '@/stores/calibration'
 import { usePackUpdatesStore } from '@/stores/packUpdates'
@@ -15,6 +15,7 @@ const navItems = [
   { to: '/estimulos', label: 'Estímulos', icon: Mic },
   { to: '/catalogos', label: 'Catálogos', icon: Package },
   { to: '/calibracion', label: 'Calibración', icon: Gauge },
+  { to: '/roadmap', label: 'Roadmap', icon: Map },
 ]
 
 export function AppLayout() {
