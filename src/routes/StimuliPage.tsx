@@ -3,9 +3,10 @@ import { Mic, Square, Play, Trash2, Plus, RefreshCw, Check, AlertTriangle, Globe
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
+import { SearchBar } from '@/components/ui/SearchBar'
+import { FilterChips, type ChipOption } from '@/components/ui/FilterChips'
 import {
   listStimulusLists, listStimuli, createStimulusList, deleteStimulusList,
   addStimulusToken, updateStimulusRecording, clearStimulusRecording, deleteStimulus,
@@ -49,6 +50,9 @@ export function StimuliPage() {
   const [newListCat, setNewListCat] = useState<StimulusCategory>('custom')
   const [newListCountry, setNewListCountry] = useState(countryCode)
 
+  const [listQuery, setListQuery] = useState('')
+  const [catFilter, setCatFilter] = useState<'all' | StimulusCategory>('all')
+
   const [newToken, setNewToken] = useState('')
 
   const [recordingId, setRecordingId] = useState<number | null>(null)
@@ -79,6 +83,35 @@ export function StimuliPage() {
   useEffect(() => { refreshItems() }, [selectedListId])
 
   const selectedList = useMemo(() => lists.find(l => l.id === selectedListId) ?? null, [lists, selectedListId])
+
+  const filteredLists = useMemo(() => {
+    const nq = listQuery.trim()
+      ? listQuery.trim().toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '')
+      : ''
+    return lists.filter(l => {
+      if (catFilter !== 'all' && l.category !== catFilter) return false
+      if (!nq) return true
+      const hay = (l.name + ' ' + l.code + ' ' + (l.description ?? ''))
+        .toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '')
+      return hay.includes(nq)
+    })
+  }, [lists, listQuery, catFilter])
+
+  const catCounts = useMemo(() => {
+    const m: Record<string, number> = { all: lists.length }
+    for (const l of lists) m[l.category] = (m[l.category] ?? 0) + 1
+    return m
+  }, [lists])
+
+  const catOptions: ChipOption<'all' | StimulusCategory>[] = useMemo(() => {
+    const base: ChipOption<'all' | StimulusCategory>[] = [
+      { value: 'all', label: 'Todas', count: catCounts.all },
+    ]
+    for (const c of CATEGORIES) {
+      if (catCounts[c.value]) base.push({ value: c.value, label: c.label, count: catCounts[c.value] })
+    }
+    return base
+  }, [catCounts])
 
   const createList = async () => {
     if (!newListName.trim()) return
@@ -261,8 +294,15 @@ export function StimuliPage() {
             <CardTitle className="text-base">Listas</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
+            <SearchBar value={listQuery} onChange={setListQuery} placeholder="Buscar lista..." className="mb-1" />
+            <div className="overflow-x-auto -mx-1 px-1 pb-1">
+              <FilterChips options={catOptions} value={catFilter} onChange={setCatFilter} className="flex-nowrap" />
+            </div>
             {lists.length === 0 && <p className="text-xs text-[var(--muted-foreground)]">No hay listas para este país.</p>}
-            {lists.map(l => (
+            {lists.length > 0 && filteredLists.length === 0 && (
+              <p className="text-xs text-[var(--muted-foreground)]">Sin coincidencias.</p>
+            )}
+            {filteredLists.map(l => (
               <div
                 key={l.id}
                 className={`p-2.5 rounded-md cursor-pointer border transition-colors ${selectedListId === l.id ? 'border-[var(--primary)] bg-[var(--primary)]/5' : 'border-[var(--border)]/50 hover:bg-[var(--secondary)]'}`}

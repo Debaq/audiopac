@@ -385,3 +385,101 @@ Métrica clínica: **raw score total**, **corrected score** (ajuste por edad), *
 - ✅ Dichotic vía sintaxis `"L|R"` en patrón (en lugar de `simultaneousChannels` bool)
 
 Habilitó 9 plantillas PAC nuevas (mig 005 + 006).
+
+---
+
+## 8. Fase UX — Búsqueda y dinámica de listados ✅ hecho
+
+Objetivo: unificar búsqueda/filtrado en páginas con listas acumulativas. Inspirado en flujo "nuevo reporte" de OtoReport (combobox paciente con creación inline).
+
+### 8.1 Componentes reusables nuevos
+
+- ✅ `src/components/ui/SearchBar.tsx` — input con icono `Search`, botón clear, debounce opcional. Reemplaza el patrón ad-hoc que sólo tenía `PatientsPage`.
+- ✅ `src/components/ui/FilterChips.tsx` — chips togglables con etiqueta y conteo por opción. Activo = primario, inactivo = outline. Genérico sobre `T extends string`.
+- ✅ `src/components/PatientCombobox.tsx` — input + dropdown flotante. Busca por `first_name`/`last_name`/`document_id`/`id`. Normaliza acentos (NFD). Navegación por teclado (↑↓ Enter Esc). Render: avatar iniciales + nombre + doc + edad + `#id`. **Creación inline**: si no hay match, botón "Crear paciente \"{query}\" como nuevo" abre `PatientForm` prellenado (ruta numérica → documento; ruta texto → first_name + last_name). Tras guardar, selecciona al paciente recién creado automáticamente.
+- ✅ `src/components/TestCombobox.tsx` — igual patrón que PatientCombobox pero para `TestTemplateParsed`. Busca por nombre/código/descripción/tipo. Muestra badge `test_type` + código monoespaciado.
+- ✅ `PatientForm` — extendido con prop `defaults?: Partial<Patient>` para prefill sin gatillar modo edit. `onSaved(id?)` devuelve id recién creado.
+
+### 8.2 Páginas migradas
+
+| Página | Antes | Después |
+|---|---|---|
+| `EvaluationHomePage` | `<select>` plano paciente + test | `<PatientCombobox>` con creación inline + `<TestCombobox>` con búsqueda |
+| `TestsPage` | Sin filtros ni búsqueda | `SearchBar` (nombre/código/descripción) + `FilterChips` tipo (DPS/PPS/CUSTOM) + origen (estándar/custom). Muestra código monoespaciado junto al nombre |
+| `ReportsPage` | 500 sesiones sin filtro | `SearchBar` (paciente/test/evaluador/ID) + `FilterChips` estado (completados/en curso/cancelados) con conteos |
+| `PacksSection` (en `/catalogos`) | Grid sin filtros | `SearchBar` (nombre/id/categoría) + `FilterChips` estado (instalados/disponibles/updates) + requirements (ninguno/recording/audio_pack) |
+| `StimuliPage` | Select país + lista sin filtro | Mantiene selector país + agrega `SearchBar` lista (nombre/código/descripción) + `FilterChips` categoría con conteos |
+
+### 8.3 Dinámica de creación inline (patrón OtoReport)
+
+Antes el flujo "nueva evaluación sin paciente pre-existente" requería: `/evaluacion` → "ah no está" → ir a `/pacientes` → "nuevo paciente" → llenar → volver a `/evaluacion` → buscar en select → continuar. Ahora: se tipea el nombre en el combobox, el dropdown ofrece "crear con este nombre", modal inline, al guardar queda seleccionado automáticamente y el flujo sigue. Cero navegación lateral.
+
+### 8.4 Pendiente UX (fuera de esta tanda)
+
+- Ordenamiento (fecha/nombre) en `ReportsPage`.
+- Búsqueda en `/pacientes/:id` (histórico sesiones del paciente).
+- Paginación real en `ReportsPage` (hoy `LIMIT 500` hardcoded).
+- Filtros en `PatientDetailPage` para histórico de tests del paciente.
+- Atajos teclado globales (`Ctrl+K` spotlight de búsqueda unificada paciente+test+pack).
+
+### 8.5 Pendiente — Mejoras profundas en `/tests`
+
+Refactor de la página de tests para ir **más allá** de buscador+chips: organización jerárquica y fichas clínicas ricas por test.
+
+**Organización jerárquica (carpetas/familias)**
+- Agrupar visualmente por **pack de origen** (`packs.name`) o por **familia funcional** (PAC patrones / PAC temporal / PAC binaural / PAC ruido / Logoaudiometría / Dichotic / HINT / Matrix / Custom).
+- Vista árbol o acordeón colapsable: cada familia como carpeta con conteo, expandir → lista de tests del grupo.
+- Switch de vista: `Plano | Por pack | Por familia | Por uso clínico` (pediátrico, adulto, screening, diagnóstico).
+- Tests creados por usuario (`pack_id = NULL`) van a carpeta "Personalizados" independiente.
+
+**Ordenamiento configurable**
+- Orden por: nombre, código, fecha de creación, último uso (requiere JOIN con `test_sessions` para `MAX(started_at)`), frecuencia de uso (`COUNT(sessions)`), dificultad estimada.
+- Orden ascendente/descendente.
+- Persistir preferencia en `settings` (última vista + orden + filtros).
+
+**Ficha rica por test** (reemplaza card mínima actual)
+Cada test al clickearlo abre vista/modal tipo `PackDetailDialog` pero a nivel test. Campos:
+- **Para qué sirve**: objetivo clínico (ej: "evaluar discriminación fina de frecuencia en el dominio temporal").
+- **Cómo funciona**: explicación del paradigma (2 tonos, "¿iguales o diferentes?", umbral adaptativo, etc).
+- **Cómo se realiza**: protocolo paso-a-paso para el evaluador (posición del paciente, instrucción exacta, duración estimada, oído).
+- **Qué paciente lo necesita**: población diana (edad mínima/máxima, indicaciones: sospecha de TPAC, seguimiento TDAH, post-trauma, dislexia, etc). Contraindicaciones si aplica.
+- **Interpretación**: bandas normativas por edad (ya parcialmente en `packs.interpretation`, falta extender), verdict automático, límites clínicos.
+- **Referencias**: citas bibliográficas con DOI/link, autor del paradigma, año, validación en ES si existe.
+- **Material relacionado**: PDFs de instructivo, videos demo (opcional), lista de estímulos usados (link a `/estimulos`).
+
+**Schema implicado**
+Extender `PackManifest.tests[]` con campos nuevos (backwards compatible, opcionales):
+```ts
+interface PackTest {
+  code: string
+  name: string
+  config: TestConfig
+  // nuevos:
+  family?: string                    // "pac.temporal", "logoaud", etc (reutilizar `pack.category`)
+  purpose_md?: string                // para qué sirve
+  how_it_works_md?: string           // cómo funciona (paradigma)
+  protocol_md?: string               // cómo se realiza (procedimiento)
+  target_population_md?: string      // qué paciente
+  contraindications_md?: string      // contraindicaciones
+  estimated_duration_min?: number
+  min_age_years?: number
+  max_age_years?: number
+  references?: Array<{ citation: string; url?: string; doi?: string; year?: number }>
+  attachments?: Array<{ label: string; url: string; kind: 'pdf' | 'video' | 'link' }>
+}
+```
+Almacenado dentro de `test_templates.metadata_json` (columna nueva o reutilizar `description` → migrar). Todo viene del pack JSON en `audiopac-assets`, sin tocar la app salvo renderer markdown (ya existe `lib/markdown.tsx`).
+
+**UI concreta**
+- `/tests` → layout 2-columnas: izquierda árbol familias/packs con búsqueda, derecha detalle del test seleccionado.
+- Botón "Iniciar evaluación con este test" directo desde la ficha (prefill `templateId` al navegar a `/evaluacion`).
+- Botón "Ver en contexto del pack" abre `PackDetailDialog`.
+- Mobile: stack vertical, árbol colapsado arriba.
+
+**Scope**
+Es un refactor medio-grande: UI + schema pack + backfill de contenido clínico (tarea de redacción) en los 14 packs existentes. Recomendable por fases:
+1. Extender tipo `PackTest` + parser (backwards compat).
+2. Vista árbol + ordenamiento configurable (sin contenido rico todavía).
+3. Ficha rica vacía + render markdown de campos opcionales.
+4. Redactar contenido clínico pack por pack y re-publicar en `audiopac-assets`.
+5. Referencias cruzadas (sugerir tests relacionados por familia).

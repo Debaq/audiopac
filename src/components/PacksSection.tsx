@@ -3,6 +3,8 @@ import { Package, Download, Trash2, AlertTriangle, Check, RefreshCw, Mic, Music,
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { SearchBar } from '@/components/ui/SearchBar'
+import { FilterChips, type ChipOption } from '@/components/ui/FilterChips'
 import {
   fetchPacksIndex, fetchPackManifest, installPack, uninstallPack, listInstalledPacks,
   type PacksIndex, type InstalledPack,
@@ -17,6 +19,13 @@ const REQ_LABEL: Record<PackRequirements, { icon: typeof Mic; text: string; colo
   audio_pack: { icon: FileAudio, text: 'Audio en pack adicional', color: 'text-sky-600' },
 }
 
+type StateFilter = 'all' | 'installed' | 'available' | 'updates'
+type ReqFilter = 'all' | PackRequirements
+
+function norm(s: string): string {
+  return s.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '')
+}
+
 export function PacksSection() {
   const [index, setIndex] = useState<PacksIndex | null>(null)
   const [installed, setInstalled] = useState<Record<string, InstalledPack>>({})
@@ -24,6 +33,9 @@ export function PacksSection() {
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [detail, setDetail] = useState<PacksIndexEntry | null>(null)
+  const [query, setQuery] = useState('')
+  const [stateFilter, setStateFilter] = useState<StateFilter>('all')
+  const [reqFilter, setReqFilter] = useState<ReqFilter>('all')
   const refreshGlobal = usePackUpdatesStore(s => s.refresh)
 
   const load = async () => {
@@ -100,9 +112,50 @@ export function PacksSection() {
 
       {loading && !index && <p className="text-xs text-[var(--muted-foreground)]">Cargando índice…</p>}
 
-      {index && (
+      {index && (() => {
+        const packs = index.packs
+        const counts = {
+          all: packs.length,
+          installed: packs.filter(p => installed[p.id] && installed[p.id].version === p.version).length,
+          available: packs.filter(p => !installed[p.id]).length,
+          updates: packs.filter(p => installed[p.id] && installed[p.id].version !== p.version).length,
+        }
+        const stateOpts: ChipOption<StateFilter>[] = [
+          { value: 'all', label: 'Todos', count: counts.all },
+          { value: 'installed', label: 'Instalados', count: counts.installed },
+          { value: 'available', label: 'Disponibles', count: counts.available },
+          { value: 'updates', label: 'Actualizaciones', count: counts.updates },
+        ]
+        const reqOpts: ChipOption<ReqFilter>[] = [
+          { value: 'all', label: 'Requisito: todos' },
+          { value: 'ninguno', label: 'Listo' },
+          { value: 'recording', label: 'Requiere grabación' },
+          { value: 'audio_pack', label: 'Requiere audio pack' },
+        ]
+        const nq = query.trim() ? norm(query.trim()) : ''
+        const filtered = packs.filter(p => {
+          const inst = installed[p.id]
+          if (stateFilter === 'installed' && !(inst && inst.version === p.version)) return false
+          if (stateFilter === 'available' && inst) return false
+          if (stateFilter === 'updates' && !(inst && inst.version !== p.version)) return false
+          if (reqFilter !== 'all' && p.requirements !== reqFilter) return false
+          if (!nq) return true
+          return norm(p.name).includes(nq) || norm(p.id).includes(nq) || norm(p.category).includes(nq)
+        })
+        return (
+        <>
+        <div className="mb-3 space-y-2">
+          <SearchBar value={query} onChange={setQuery} placeholder="Buscar pack por nombre, id o categoría..." />
+          <div className="flex gap-3 flex-wrap">
+            <FilterChips options={stateOpts} value={stateFilter} onChange={setStateFilter} />
+            <FilterChips options={reqOpts} value={reqFilter} onChange={setReqFilter} />
+          </div>
+        </div>
+        {filtered.length === 0 ? (
+          <p className="text-xs text-[var(--muted-foreground)] py-4 text-center">Sin coincidencias.</p>
+        ) : (
         <div className="grid gap-3 md:grid-cols-2">
-          {index.packs.map(p => {
+          {filtered.map(p => {
             const inst = installed[p.id]
             const isInstalled = !!inst
             const versionMismatch = isInstalled && inst.version !== p.version
@@ -159,7 +212,10 @@ export function PacksSection() {
             )
           })}
         </div>
-      )}
+        )}
+        </>
+        )
+      })()}
 
       {detail && (
         <PackDetailDialog

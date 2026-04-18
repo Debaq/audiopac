@@ -5,13 +5,14 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
-import { listPatients } from '@/lib/db/patients'
+import { PatientCombobox } from '@/components/PatientCombobox'
+import { TestCombobox } from '@/components/TestCombobox'
 import { listTemplates } from '@/lib/db/templates'
 import { createSession, listInProgressSessions, cancelSession } from '@/lib/db/sessions'
 import { getActiveCalibration, getActiveCurve } from '@/lib/db/calibrations'
 import { PreSessionCheck } from '@/components/PreSessionCheck'
 import { useAuth } from '@/stores/auth'
-import type { Patient, TestTemplateParsed, Ear, ResponseMode, SessionWithDetails } from '@/types'
+import type { TestTemplateParsed, Ear, ResponseMode, SessionWithDetails } from '@/types'
 import { formatDateTime } from '@/lib/utils'
 
 export function EvaluationHomePage() {
@@ -19,19 +20,17 @@ export function EvaluationHomePage() {
   const [params] = useSearchParams()
   const profile = useAuth(s => s.activeProfile)
 
-  const [patients, setPatients] = useState<Patient[]>([])
   const [templates, setTemplates] = useState<TestTemplateParsed[]>([])
   const [pending, setPending] = useState<SessionWithDetails[]>([])
-  const [patientId, setPatientId] = useState<number | ''>('')
-  const [templateId, setTemplateId] = useState<number | ''>('')
+  const [patientId, setPatientId] = useState<number | null>(null)
+  const [templateId, setTemplateId] = useState<number | null>(null)
   const [ear, setEar] = useState<Ear>('binaural')
   const [responseMode, setResponseMode] = useState<ResponseMode>('manual')
   const [starting, setStarting] = useState(false)
   const [showCheck, setShowCheck] = useState(false)
 
   useEffect(() => {
-    Promise.all([listPatients(), listTemplates(true), listInProgressSessions()]).then(([p, t, ip]) => {
-      setPatients(p)
+    Promise.all([listTemplates(true), listInProgressSessions()]).then(([t, ip]) => {
       setTemplates(t)
       setPending(ip)
       const urlP = params.get('patient')
@@ -66,8 +65,8 @@ export function EvaluationHomePage() {
         ? JSON.stringify(curve.map(p => ({ frequency_hz: p.frequency_hz, ear: p.ear, ref_db_spl: p.ref_db_spl })))
         : null
       const sid = await createSession({
-        patient_id: Number(patientId),
-        template_id: Number(templateId),
+        patient_id: patientId,
+        template_id: templateId,
         profile_id: profile.id,
         ear,
         response_mode: responseMode,
@@ -125,26 +124,11 @@ export function EvaluationHomePage() {
         <CardContent className="space-y-4">
           <div>
             <Label>Paciente</Label>
-            <Select value={patientId} onChange={e => setPatientId(e.target.value ? Number(e.target.value) : '')}>
-              <option value="">-- seleccionar --</option>
-              {patients.map(p => (
-                <option key={p.id} value={p.id}>{p.last_name}, {p.first_name}</option>
-              ))}
-            </Select>
-            {patients.length === 0 && (
-              <p className="text-sm text-[var(--muted-foreground)] mt-2">
-                Sin pacientes. <a href="/pacientes" className="text-[var(--primary)]">Crear uno</a>
-              </p>
-            )}
+            <PatientCombobox value={patientId} onChange={setPatientId} autoFocus />
           </div>
           <div>
             <Label>Test</Label>
-            <Select value={templateId} onChange={e => setTemplateId(e.target.value ? Number(e.target.value) : '')}>
-              <option value="">-- seleccionar --</option>
-              {templates.map(t => (
-                <option key={t.id} value={t.id}>{t.name} [{t.test_type}]</option>
-              ))}
-            </Select>
+            <TestCombobox templates={templates} value={templateId} onChange={setTemplateId} />
             {selectedTemplate && (
               <p className="text-sm text-[var(--muted-foreground)] mt-2">{selectedTemplate.description}</p>
             )}

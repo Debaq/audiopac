@@ -11,24 +11,26 @@ import type { Patient } from '@/types'
 
 export function PatientForm({
   patient,
+  defaults,
   onClose,
   onSaved,
 }: {
   patient?: Patient | null
+  defaults?: Partial<Pick<Patient, 'document_id' | 'first_name' | 'last_name' | 'birth_date' | 'gender' | 'phone' | 'email' | 'address' | 'notes'>>
   onClose: () => void
-  onSaved: () => void
+  onSaved: (id?: number) => void
 }) {
   const profile = useAuth(s => s.activeProfile)
   const [form, setForm] = useState({
-    document_id: patient?.document_id ?? '',
-    first_name: patient?.first_name ?? '',
-    last_name: patient?.last_name ?? '',
-    birth_date: patient?.birth_date ?? '',
-    gender: patient?.gender ?? '',
-    phone: patient?.phone ?? '',
-    email: patient?.email ?? '',
-    address: patient?.address ?? '',
-    notes: patient?.notes ?? '',
+    document_id: patient?.document_id ?? defaults?.document_id ?? '',
+    first_name: patient?.first_name ?? defaults?.first_name ?? '',
+    last_name: patient?.last_name ?? defaults?.last_name ?? '',
+    birth_date: patient?.birth_date ?? defaults?.birth_date ?? '',
+    gender: patient?.gender ?? defaults?.gender ?? '',
+    phone: patient?.phone ?? defaults?.phone ?? '',
+    email: patient?.email ?? defaults?.email ?? '',
+    address: patient?.address ?? defaults?.address ?? '',
+    notes: patient?.notes ?? defaults?.notes ?? '',
   })
   const [saving, setSaving] = useState(false)
 
@@ -48,9 +50,8 @@ export function PatientForm({
         notes: form.notes || null,
         created_by: profile?.id ?? null,
       }
-      if (patient) await updatePatient(patient.id, payload)
-      else await createPatient(payload)
-      onSaved()
+      if (patient) { await updatePatient(patient.id, payload); onSaved(patient.id) }
+      else { const nid = await createPatient(payload); onSaved(nid) }
     } finally {
       setSaving(false)
     }
