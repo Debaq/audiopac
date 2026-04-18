@@ -290,6 +290,151 @@ cmd_info() {
     fi
 }
 
+# ── Release ──────────────────────────────────────────────────────────────────
+cmd_release() {
+    header "Nuevo release"
+    cd "$PROJECT_DIR"
+
+    # Verificar gh
+    if ! command -v gh &>/dev/null; then
+        error "gh (GitHub CLI) no instalado"
+        return 1
+    fi
+
+    # Verificar working tree limpio
+    if [[ -n "$(git status --porcelain)" ]]; then
+        error "Hay cambios sin commitear. Commitea o stashea antes."
+        git status --short
+        return 1
+    fi
+
+    # Verificar branch main
+    local branch=$(git branch --show-current)
+    if [[ "$branch" != "main" ]]; then
+        warn "No estas en main (actual: $branch)"
+        read -rp "¿Continuar de todas formas? (s/N) " ans
+        [[ "$ans" =~ ^[sS]$ ]] || return 1
+    fi
+
+    # Parsear versión actual
+    local current="$VERSION"
+    local IFS='.'
+    read -r major minor patch <<< "$current"
+    unset IFS
+
+    if [[ -z "$major" || -z "$minor" || -z "$patch" ]]; then
+        error "Versión actual invalida: $current"
+        return 1
+    fi
+
+    # Sugerencias
+    local next_major="$((major + 1)).0.0"
+    local next_minor="$major.$((minor + 1)).0"
+    local next_patch="$major.$minor.$((patch + 1))"
+
+    echo -e "${BOLD}Version actual:${NC} ${CYAN}v$current${NC}"
+    echo ""
+    echo -e "  ${GREEN}1${NC}) patch  → v${next_patch}  ${DIM}(fixes, cambios menores)${NC}"
+    echo -e "  ${YELLOW}2${NC}) minor  → v${next_minor}  ${DIM}(features nuevas compatibles)${NC}"
+    echo -e "  ${RED}3${NC}) major  → v${next_major}  ${DIM}(cambios breaking)${NC}"
+    echo -e "  ${BLUE}4${NC}) custom ${DIM}(escribir version manual)${NC}"
+    echo -e "  ${DIM}0) cancelar${NC}"
+    echo ""
+    read -rp "Opcion: " opt
+
+    local new_version=""
+    case "$opt" in
+        1) new_version="$next_patch" ;;
+        2) new_version="$next_minor" ;;
+        3) new_version="$next_major" ;;
+        4)
+            read -rp "Nueva version (X.Y.Z): " new_version
+            if [[ ! "$new_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                error "Formato invalido. Debe ser X.Y.Z"
+                return 1
+            fi
+            ;;
+        0|"") info "Cancelado"; return 0 ;;
+        *) error "Opcion no valida"; return 1 ;;
+    esac
+
+    # Verificar tag no existe
+    if git rev-parse "v$new_version" &>/dev/null; then
+        error "Tag v$new_version ya existe"
+        return 1
+    fi
+
+    # Mostrar commits desde último tag
+    local last_tag=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+    echo ""
+    echo -e "${BOLD}Commits desde ${last_tag:-inicio}:${NC}"
+    if [[ -n "$last_tag" ]]; then
+        git log "${last_tag}..HEAD" --oneline | head -30
+    else
+        git log --oneline | head -30
+    fi
+    echo ""
+
+    echo -e "${BOLD}Resumen:${NC}"
+    echo -e "  v${CYAN}$current${NC} → v${GREEN}$new_version${NC}"
+    echo -e "  - Actualiza package.json, tauri.conf.json, Cargo.toml, Cargo.lock"
+    echo -e "  - Crea commit chore(release): v$new_version"
+    echo -e "  - Crea tag v$new_version"
+    echo -e "  - Push a origin/main + tag"
+    echo -e "  - GitHub Actions compilara Linux + Windows y publicara release"
+    echo ""
+    read -rp "¿Confirmar? (s/N) " confirm
+    [[ "$confirm" =~ ^[sS]$ ]] || { info "Cancelado"; return 0; }
+
+    # Bump versiones
+    info "Actualizando archivos de version..."
+    sed -i "s/\"version\": \"$current\"/\"version\": \"$new_version\"/" "$PROJECT_DIR/package.json"
+    sed -i "s/\"version\": \"$current\"/\"version\": \"$new_version\"/" "$TAURI_DIR/tauri.conf.json"
+    sed -i "s/^version = \"$current\"/version = \"$new_version\"/" "$TAURI_DIR/Cargo.toml"
+    # Cargo.lock: actualiza solo el bloque name="audiopac"
+    python3 -c "
+import re, sys
+p = '$TAURI_DIR/Cargo.lock'
+with open(p) as f: s = f.read()
+s = re.sub(r'(name = \"audiopac\"\nversion = \")$current(\")', r'\g<1>$new_version\g<2>', s)
+with open(p, 'w') as f: f.write(s)
+" 2>/dev/null || {
+        # Fallback sin python
+        warn "python3 no disponible, usando sed para Cargo.lock (menos seguro)"
+        sed -i "/^name = \"audiopac\"$/,/^version = / s/^version = \"$current\"/version = \"$new_version\"/" "$TAURI_DIR/Cargo.lock"
+    }
+
+    success "Versiones actualizadas a $new_version"
+
+    # Commit
+    info "Creando commit..."
+    git add package.json "$TAURI_DIR/tauri.conf.json" "$TAURI_DIR/Cargo.toml" "$TAURI_DIR/Cargo.lock"
+    git commit -m "chore(release): v$new_version"
+
+    # Tag
+    info "Creando tag v$new_version..."
+    git tag -a "v$new_version" -m "AudioPAC v$new_version"
+
+    # Push
+    info "Push a origin..."
+    git push origin main
+    git push origin "v$new_version"
+
+    success "Release v$new_version publicado"
+    echo ""
+    info "GitHub Actions esta compilando el release."
+    info "Ver progreso:"
+    echo -e "  ${CYAN}gh run watch${NC}"
+    echo -e "  ${CYAN}https://github.com/$(gh repo view --json nameWithOwner -q .nameWithOwner)/actions${NC}"
+    echo ""
+
+    read -rp "¿Abrir el run en el navegador? (s/N) " open_ans
+    if [[ "$open_ans" =~ ^[sS]$ ]]; then
+        sleep 3  # esperar que el workflow aparezca
+        gh run list --workflow=release.yml --limit=1 --json databaseId -q '.[0].databaseId' | xargs -I {} gh run view {} --web 2>/dev/null || gh workflow view release.yml --web
+    fi
+}
+
 # ══════════════════════════════════════════════════════════════════════════════
 # ── MENU INTERACTIVO ─────────────────────────────────────────────────────────
 # ══════════════════════════════════════════════════════════════════════════════
@@ -329,6 +474,9 @@ show_menu() {
     echo -e "  ${RED}11${NC}) Reset DB           ${DIM}Borrar base de datos local${NC}"
     echo -e "  ${RED}12${NC}) Limpiar build      ${DIM}dist/ + cargo clean${NC}"
     echo ""
+    echo -e "${BOLD} RELEASE${NC}"
+    echo -e "  ${MAGENTA}13${NC}) Nuevo release     ${DIM}Bump version + tag + push + GH Actions${NC}"
+    echo ""
     echo -e "  ${BOLD}0${NC})  Salir"
     echo ""
 }
@@ -354,6 +502,7 @@ menu_loop() {
             10) cmd_db_path;        pause_after ;;
             11) cmd_db_reset;       pause_after ;;
             12) cmd_clean;          pause_after ;;
+            13) cmd_release;        pause_after ;;
             0|q|salir) echo -e "\n${GREEN}Hasta luego${NC}"; exit 0 ;;
             "") ;;
             *)  error "Opcion no valida: $choice"; sleep 1 ;;
@@ -381,6 +530,7 @@ cmd_help() {
     echo "  db:path        Ubicacion de la base de datos"
     echo "  db:reset       Borrar base de datos local"
     echo "  clean          Limpiar dist/ + cargo clean"
+    echo "  release        Nuevo release (bump + tag + push + GH Actions)"
     echo "  help           Esta ayuda"
 }
 
@@ -406,6 +556,7 @@ main() {
         db:path)        cmd_db_path ;;
         db:reset)       cmd_db_reset ;;
         clean)          cmd_clean ;;
+        release)        cmd_release ;;
         help|--help|-h) cmd_help ;;
         *)              error "Comando desconocido: $1"; cmd_help; exit 1 ;;
     esac
