@@ -233,8 +233,16 @@ export async function playSequence(
     fallbackFreq?: number
   ): { source: AudioScheduledSourceNode; head: AudioNode } {
     const src = ctx.createBufferSource()
-    src.buffer = nt === 'pink' ? getPinkNoiseBuffer(ctx) : getWhiteNoiseBuffer(ctx)
+    src.buffer = (nt === 'pink' || nt === 'ssn') ? getPinkNoiseBuffer(ctx) : getWhiteNoiseBuffer(ctx)
     src.loop = true
+    if (nt === 'ssn') {
+      const lp = ctx.createBiquadFilter()
+      lp.type = 'lowpass'
+      lp.frequency.value = 1000
+      lp.Q.value = 0.707
+      src.connect(lp)
+      return { source: src, head: lp }
+    }
     if (nt === 'narrow') {
       const filt = ctx.createBiquadFilter()
       filt.type = 'bandpass'
@@ -504,7 +512,7 @@ export async function playStimulusWithNoise(
   const voiceGain = dbToGain(level_db - rms, ref)
   // Ruido: el buffer blanco/rosa tiene RMS ≈ -3 dBFS (white) / variable (pink); aprox -15 dBFS pink tras escalado.
   // Usamos el gain de mapeo SPL directo asumiendo que el ruido está cerca 0 dBFS. Para calibración estricta, medir.
-  const noiseRmsDbfs = noise_type === 'pink' ? -15 : -5
+  const noiseRmsDbfs = noise_type === 'ssn' ? -20 : noise_type === 'pink' ? -15 : -5
   const noiseGain = dbToGain(noise_level_db - noiseRmsDbfs, ref)
 
   const merger = ctx.createChannelMerger(2)
@@ -521,14 +529,23 @@ export async function playStimulusWithNoise(
   vL.connect(merger, 0, 0); vR.connect(merger, 0, 1)
 
   // Ruido
-  const noiseBuf = noise_type === 'pink' ? getPinkNoiseBuffer(ctx) : getWhiteNoiseBuffer(ctx)
+  const noiseBuf = (noise_type === 'pink' || noise_type === 'ssn') ? getPinkNoiseBuffer(ctx) : getWhiteNoiseBuffer(ctx)
   const srcN = ctx.createBufferSource()
   srcN.buffer = noiseBuf
   srcN.loop = true
   const gN = ctx.createGain()
   const nL = ctx.createGain(); nL.gain.value = l
   const nR = ctx.createGain(); nR.gain.value = r
-  srcN.connect(gN); gN.connect(nL); gN.connect(nR)
+  let noiseHead: AudioNode = srcN
+  if (noise_type === 'ssn') {
+    const lp = ctx.createBiquadFilter()
+    lp.type = 'lowpass'
+    lp.frequency.value = 1000
+    lp.Q.value = 0.707
+    srcN.connect(lp)
+    noiseHead = lp
+  }
+  noiseHead.connect(gN); gN.connect(nL); gN.connect(nR)
   nL.connect(merger, 0, 0); nR.connect(merger, 0, 1)
   merger.connect(ctx.destination)
 

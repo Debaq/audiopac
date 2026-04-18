@@ -156,9 +156,10 @@ Objetivo: que los dB reportados sean dB SPL reales, no pseudo-calibrados.
 - ~~Importador pack Sharvard local~~ (reemplazado por `/catalogos` → repo remoto). Usuario descarga `sig.zip` de Zenodo, lo descomprime, elige carpeta `sig/F` o `sig/M`, y un único click importa los 700 WAV: busca `shd001..shd700.wav`, mapea a `SHARVARD_ES_L{ceil(n/10)}` posición `((n-1)%10)+1`, procesa con `processClip` (HP 80, trim VAD, norm −20 dBFS, denoise OFF porque audio ya pro), encodea WAV PCM 16-bit y escribe a `appDataDir/stimuli/`. Barra de progreso + lista de errores.
 - ✅ **Corpus Sharvard ES** (migración 017). 700 frases peninsular ES (Aubanel et al. 2014, Zenodo 3547446), 70 listas × 10, balanceadas fonémicamente, 5 keywords por frase. Script `scripts/build-sharvard-migration.mjs` parsea `sharvard/lists-phonemic-SAMPA.txt` (formato `code|ortho_uppercase_keys|SAMPA`) — extrae keywords por detección de palabras en mayúsculas, normaliza texto final, emite SQL. Plantilla `HINT_SHARVARD_L01` seed (usuario puede clonar para usar otra lista). Audios Sharvard (265 MB `sig.zip`) NO se empaquetan — usuario descarga pack aparte o graba propios.
 - ✅ **HINT-ES adaptativo en ruido** (migraciones 015 + 016). Schema `stimuli.keywords_json` (array palabras clave) + `metadata_json`. `HINTController` (`src/lib/audio/hintRunner.ts`) adapta SNR por bracketing: cada trial es una frase, pasa si ≥`threshold_pass_ratio` de keywords correctos; desciende SNR tras pasar, sube tras fallar. Engine: `playStimulusWithNoise(buffer, voice_db, noise_db, type)` mezcla voz + ruido rosa/blanco con lead-in/out 200 ms. UI `/estimulos` permite marcar keywords por frase clickeando palabras en listas `category=sentence`. Componente `HINTRun.tsx` muestra frase con chips clickables (solo keywords marcables), controles "todas ok" / "ninguna". Plantilla `HINT_ES_CUSTOM` apunta a `HINT_ES_CUSTOM_A` (lista vacía, usuario graba). ⚠️ Pendiente: bundle Sharvard 700 frases (repo `audiopac-assets` aparte, aún no creado). Calibración ruido: usa aproximación `rms_dbfs` por tipo (−15 pink, −5 white). Para clínica estricta, calibrar ruido por separado.
-- Biblioteca de listas estándar (PAL, PALPA)
+- ✅ **PALPA-E** (pack `palpa-es-v1`). 40 palabras → 20 pares mínimos consonánticos (oclusivas sordas/sonoras, fricativas, nasales, laterales, vibrantes), categoría `discrimination`. Texto-only `requirements:'recording'`. Norma `accuracy_pct` ≥90% adulto sano. Referencias Kay/Lesser/Coltheart 1992 + Valle/Cuetos 1995.
 - ✅ **Dichotic Digits ES** (migración 014). Plantillas `DD_ES_FREE` (recuerdo libre) y `DD_ES_DIRECTED` (recuerdo dirigido alternando oído inicial). Usa `playStimulusPair` en `engine.ts` para disparar dos `AudioBuffer` simultáneos con mismo `startTime` (uno por oído). Lista `DICHOTIC_DIGITS_ES` (mig 012) con dígitos 1–9 excluyendo "siete". Scoring por oído con asimetría (R − L). Pares configurables (default 20 pares · 2 dígitos/oído · 55 dB HL).
-- SSW adaptado, SinB-ES (pendiente)
+- ✅ **SinB-ES** (pack `sinb-es-v1`). Variante HINT con ruido **SSN** (Speech-Shaped Noise = rosa filtrado LP 1 kHz Q=0.707, aproxima LTASS habla). Engine: extendido `NoiseType` con `'ssn'`, `playStimulusWithNoise` y `makeNoiseHead` insertan BiquadFilter LP cuando aplica. `noiseRmsDbfs = -20` para SSN. Pack reusa `HINTController` (sin runner nuevo) con `noise_type:'ssn'`. Lista vacía `requirements:'recording'`. Norma `srt_db` por edad (jóvenes -8 a -3, mayores -2 a 8).
+- SSW adaptado (pendiente)
 
 ### Fase 5 — Ruido (bonus) ✅ parcial (migración 007)
 - ✅ Generador de ruido blanco (buffer random en loop)
@@ -198,6 +199,8 @@ Objetivo: que los dB reportados sean dB SPL reales, no pseudo-calibrados.
 | `dichotic-digits-es-v1` | DD_ES_FREE, DD_ES_DIRECTED | DICHOTIC_DIGITS_ES (8 dígitos) | recording |
 | `hint-es-v1` | HINT_ES_CUSTOM | HINT_ES_CUSTOM_A (vacía) | recording |
 | `sharvard-es-v1` | HINT_SHARVARD_L01 | (referencia a `catalogs/sharvard-es-v1.json`, 70 listas × 10) | audio_pack |
+| `sinb-es-v1` | SINB_ES_CUSTOM | SINB_ES_CUSTOM_A (vacía) | recording |
+| `palpa-es-v1` | — | PALPA_PARES_MIN_ES_A (40 palabras) | recording |
 
 **Pendiente:**
 
@@ -286,8 +289,8 @@ Ficha muestra: descripción, licencia, referencias, cantidad de tests/listas, ta
 
 - **Matrix-ES** (Hochmuth 2012) — estructura matriz pública (10×5=50 palabras) + runner 5-AFC. Audios cerrados (HörTech) → solo estructura + descripción + flag `requirements: recording`
 - **SSW adaptado** (pendiente diseño)
-- **SinB-ES** (pendiente diseño)
-- **PAL / PALPA** (texto LatAm)
+- ✅ **SinB-ES** publicado (`sinb-es-v1`)
+- ✅ **PALPA-E** publicado (`palpa-es-v1`); PAL listas LatAm cubiertas por `logoaud-latam-v1`
 - **HINT-ES clínico** (ya existe texto + audios Sharvard, solo falta reempaquetar como pack v2)
 
 #### 6.7 Riesgos y mitigaciones

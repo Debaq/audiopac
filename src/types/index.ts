@@ -30,7 +30,7 @@ export interface Patient {
   updated_at: string
 }
 
-export type NoiseType = 'white' | 'pink' | 'narrow'
+export type NoiseType = 'white' | 'pink' | 'narrow' | 'ssn'
 
 export interface NoiseMix {
   noise_type: NoiseType
