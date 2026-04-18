@@ -1,5 +1,5 @@
 import { getDb } from '@/lib/db/client'
-import type { PackInterpretation, PackInterpretationNorm, PackReference } from './types'
+import type { PackInterpretation, PackInterpretationNorm, PackReference, PackTestMeta } from './types'
 
 export interface TemplatePackInfo {
   pack_id: number
@@ -118,6 +118,97 @@ export function bandLabel(metric: string, band: PackInterpretationNorm): string 
     parts.push(`Bajo ${higherBetter ? '≤' : '≥'}${band.severe_max}${unit}`)
   }
   return parts.join(' · ')
+}
+
+export interface TemplateRichMeta {
+  pack_id: number
+  pack_code: string
+  pack_name: string
+  pack_category: string | null
+  test_meta: PackTestMeta | null
+}
+
+/**
+ * Devuelve la ficha clínica rica (purpose/protocol/referencias/etc) para
+ * un template, leída desde `packs.metadata_json.tests_meta[code]`.
+ */
+export async function getTemplateRichMeta(templateId: number): Promise<TemplateRichMeta | null> {
+  const db = await getDb()
+  const rows = await db.select<{
+    pack_id: number
+    pack_code: string
+    pack_name: string
+    pack_category: string | null
+    template_code: string
+    metadata_json: string | null
+  }[]>(
+    `SELECT p.id AS pack_id, p.code AS pack_code, p.name AS pack_name,
+            p.category AS pack_category, t.code AS template_code, p.metadata_json
+     FROM test_templates t JOIN packs p ON t.pack_id = p.id
+     WHERE t.id = $1`,
+    [templateId],
+  )
+  if (rows.length === 0) return null
+  const r = rows[0]
+  let test_meta: PackTestMeta | null = null
+  if (r.metadata_json) {
+    try {
+      const parsed = JSON.parse(r.metadata_json) as { tests_meta?: Record<string, PackTestMeta> }
+      test_meta = parsed.tests_meta?.[r.template_code] ?? null
+    } catch { /* ignore */ }
+  }
+  return {
+    pack_id: r.pack_id,
+    pack_code: r.pack_code,
+    pack_name: r.pack_name,
+    pack_category: r.pack_category,
+    test_meta,
+  }
+}
+
+/** Pack info ligero + family opcional por test, para armar el árbol de /tests. */
+export interface TemplateTreeInfo {
+  template_id: number
+  pack_id: number | null
+  pack_name: string | null
+  pack_category: string | null
+  family: string | null
+}
+
+export async function listTemplateTreeInfo(): Promise<Map<number, TemplateTreeInfo>> {
+  const db = await getDb()
+  const rows = await db.select<{
+    template_id: number
+    template_code: string
+    pack_id: number | null
+    pack_name: string | null
+    pack_category: string | null
+    metadata_json: string | null
+  }[]>(
+    `SELECT t.id AS template_id, t.code AS template_code, t.pack_id,
+            p.name AS pack_name, p.category AS pack_category, p.metadata_json
+     FROM test_templates t
+     LEFT JOIN packs p ON t.pack_id = p.id
+     WHERE t.is_active = 1`,
+  )
+  const map = new Map<number, TemplateTreeInfo>()
+  for (const r of rows) {
+    let family: string | null = null
+    if (r.metadata_json) {
+      try {
+        const parsed = JSON.parse(r.metadata_json) as { tests_meta?: Record<string, PackTestMeta> }
+        family = parsed.tests_meta?.[r.template_code]?.family ?? null
+      } catch { /* ignore */ }
+    }
+    map.set(r.template_id, {
+      template_id: r.template_id,
+      pack_id: r.pack_id,
+      pack_name: r.pack_name,
+      pack_category: r.pack_category,
+      family,
+    })
+  }
+  return map
 }
 
 /** Si el metric es auto-calculable desde test_score, devuelve el valor. Sino null. */

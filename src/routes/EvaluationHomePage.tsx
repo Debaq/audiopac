@@ -35,6 +35,8 @@ export function EvaluationHomePage() {
       setPending(ip)
       const urlP = params.get('patient')
       if (urlP) setPatientId(Number(urlP))
+      const urlT = params.get('template')
+      if (urlT) setTemplateId(Number(urlT))
     })
   }, [])
 

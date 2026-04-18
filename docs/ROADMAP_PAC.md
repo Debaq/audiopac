@@ -421,9 +421,27 @@ Antes el flujo "nueva evaluación sin paciente pre-existente" requería: `/evalu
 - ✅ **Búsqueda y filtros en `/pacientes/:id`**: `SearchBar` por test/evaluador + `FilterChips` estado (todos/completados/en curso/cancelados) sobre el histórico del paciente.
 - ✅ **Spotlight global `Ctrl+K`** (`src/components/CommandPalette.tsx`): modal con backdrop blur, busca en paralelo pacientes + tests + últimos 200 informes + paquetes instalados. Normaliza acentos (NFD). Navegación teclado (↑↓ Enter Esc), hover-to-select, grupo visible por ítem (ícono + badge). Montado en `AppLayout`, listener global `keydown` con `Ctrl+K` / `Cmd+K`. Enter navega a `/pacientes/:id`, `/tests/:id`, `/informes/:id` o `/catalogos` según tipo.
 
-### 8.5 Pendiente — Mejoras profundas en `/tests`
+### 8.5 Mejoras profundas en `/tests` ✅ hecho (infra; contenido clínico diferido)
 
 Refactor de la página de tests para ir **más allá** de buscador+chips: organización jerárquica y fichas clínicas ricas por test.
+
+**Implementado:**
+
+- ✅ **Tipo extendido `PackTest`** (`src/lib/packs/types.ts`): campos opcionales `family`, `purpose_md`, `how_it_works_md`, `protocol_md`, `target_population_md`, `contraindications_md`, `estimated_duration_min`, `min_age_years`, `max_age_years`, `references[]`, `attachments[]`. Backwards compatible — packs antiguos siguen funcionando sin cambios.
+- ✅ **Storage sin migración**: installer extrae esos campos de cada `PackTest` y los guarda dentro de `packs.metadata_json.tests_meta[code]`. No hace falta columna nueva en `test_templates`.
+- ✅ **Helpers** (`src/lib/packs/interpretation.ts`): `getTemplateRichMeta(templateId)` lee JOIN template↔pack y parsea `tests_meta` por código; `listTemplateTreeInfo()` devuelve `Map<templateId, { pack, family, pack_category }>` para armar árbol.
+- ✅ **`<TestDetailPanel>`** (`src/components/TestDetailPanel.tsx`): ficha rica con markdown render (reusa `Markdown` de `src/lib/markdown.tsx`). Renderiza secciones "Para qué sirve / Cómo funciona / Cómo se realiza / Qué paciente lo necesita / Contraindicaciones / Referencias (con DOI+link) / Material relacionado (pdf/video/link)". Badges: tipo, estándar/custom, pack (clicable abre `PackDetailDialog`), familia, rango etario, duración estimada. Botones: **Iniciar evaluación** (→ `/evaluacion?template={id}`), **Editar** (→ `/tests/{id}`), **Eliminar** (solo custom).
+- ✅ **`TestsPage` refactorizada**: layout 2-columnas (340px árbol + panel detalle), 78vh max-height con scroll independiente. Switch de vista (`FilterChips`): **Plano / Por pack / Por familia**. Selector de orden (nombre / código / más recientes / tipo). Filtros tipo + origen preservados. Grupos colapsables con chevron. Personalizados siempre como grupo separado al final. Selección persistida en URL via `?id=`.
+- ✅ **Param `?template=` en `EvaluationHomePage`**: al hacer click en "Iniciar evaluación" desde la ficha, se prellena el selector de test.
+
+**Pendiente (contenido, no código):**
+
+- Redactar `purpose_md` / `how_it_works_md` / `protocol_md` / `target_population_md` / `contraindications_md` / `references` para los 14 packs existentes y re-publicar en `audiopac-assets`. Cada pack se actualiza independiente; al reinstalar en app, la ficha se completa sola.
+- Sugerencias de tests relacionados por familia (requiere contenido clínico primero).
+- Persistir preferencia de vista/orden en `settings` (hoy reset al recargar; selección de test sí persiste via URL).
+- Stats "último uso" / "frecuencia" (requieren JOIN con `test_sessions`).
+
+#### 8.5.1 Diseño original (referencia)
 
 **Organización jerárquica (carpetas/familias)**
 - Agrupar visualmente por **pack de origen** (`packs.name`) o por **familia funcional** (PAC patrones / PAC temporal / PAC binaural / PAC ruido / Logoaudiometría / Dichotic / HINT / Matrix / Custom).

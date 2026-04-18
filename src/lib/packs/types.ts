@@ -24,6 +24,19 @@ export type StimulusListCategory =
 
 export type TestType = 'DPS' | 'PPS' | 'CUSTOM'
 
+export interface PackTestReference {
+  citation: string
+  url?: string | null
+  doi?: string | null
+  year?: number | null
+}
+
+export interface PackTestAttachment {
+  label: string
+  url: string
+  kind?: 'pdf' | 'video' | 'link'
+}
+
 export interface PackTest {
   code: string
   name: string
@@ -31,6 +44,34 @@ export interface PackTest {
   description?: string
   config_json: Record<string, unknown>
   is_standard?: 0 | 1
+  /** Familia funcional libre (ej: "pac.temporal", "logoaud"). Default: pack.category. */
+  family?: string
+  /** Markdown clínico para la ficha rica del test. Todos opcionales. */
+  purpose_md?: string
+  how_it_works_md?: string
+  protocol_md?: string
+  target_population_md?: string
+  contraindications_md?: string
+  estimated_duration_min?: number
+  min_age_years?: number
+  max_age_years?: number
+  references?: PackTestReference[]
+  attachments?: PackTestAttachment[]
+}
+
+/** Meta por test, guardada dentro de `packs.metadata_json.tests_meta[code]`. */
+export interface PackTestMeta {
+  family?: string
+  purpose_md?: string
+  how_it_works_md?: string
+  protocol_md?: string
+  target_population_md?: string
+  contraindications_md?: string
+  estimated_duration_min?: number
+  min_age_years?: number
+  max_age_years?: number
+  references?: PackTestReference[]
+  attachments?: PackTestAttachment[]
 }
 
 export interface PackStimulusItem {

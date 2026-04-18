@@ -19,9 +19,31 @@ export interface PacksIndex {
   packs: PacksIndexEntry[]
 }
 
+const TEST_META_FIELDS = [
+  'family', 'purpose_md', 'how_it_works_md', 'protocol_md',
+  'target_population_md', 'contraindications_md',
+  'estimated_duration_min', 'min_age_years', 'max_age_years',
+  'references', 'attachments',
+] as const
+
+function extractTestsMeta(manifest: PackManifest): Record<string, Record<string, unknown>> | null {
+  const out: Record<string, Record<string, unknown>> = {}
+  for (const t of manifest.tests ?? []) {
+    const meta: Record<string, unknown> = {}
+    for (const f of TEST_META_FIELDS) {
+      const v = (t as Record<string, unknown>)[f]
+      if (v !== undefined && v !== null) meta[f] = v
+    }
+    if (Object.keys(meta).length > 0) out[t.code] = meta
+  }
+  return Object.keys(out).length > 0 ? out : null
+}
+
 function serializePackMetadata(manifest: PackManifest): string | null {
   const merged: Record<string, unknown> = { ...(manifest.metadata ?? {}) }
   if (manifest.report_template_md) merged.report_template_md = manifest.report_template_md
+  const testsMeta = extractTestsMeta(manifest)
+  if (testsMeta) merged.tests_meta = testsMeta
   return Object.keys(merged).length > 0 ? JSON.stringify(merged) : null
 }
 
