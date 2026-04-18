@@ -172,7 +172,7 @@ Objetivo: que los dB reportados sean dB SPL reales, no pseudo-calibrados.
 
 ---
 
-### Fase 6 — Sistema de paquetes (arquitectura extensible) 🚧 en curso
+### Fase 6 — Sistema de paquetes (arquitectura extensible) ✅ hecho
 
 **Hecho (6.1–6.4 parcial):**
 - ✅ Schema colapsado: migraciones 002–018 fusionadas en `001_initial.sql`. App arranca con schema único v2 (settings.schema_era='v2-packs') sin seeds. Tabla `packs` + FK `pack_id` en `test_templates`/`stimulus_lists` (ON DELETE SET NULL para preservar sesiones).
@@ -201,11 +201,11 @@ Objetivo: que los dB reportados sean dB SPL reales, no pseudo-calibrados.
 
 **Pendiente:**
 
-- 6.5 Bootstrap primer arranque: modal "¿Instalar packs recomendados?" con checkboxes pre-marcados (pac-patterns, pac-limens, pac-temporal).
-- 6.6 Ficha rica del pack (markdown render de `description_md`, lista de tests/listas dentro, referencias bibliográficas, normas clínicas).
-- 6.7 Interpretación dinámica en `SessionReportPage`: leer `pack.interpretation.norms_by_age` → semáforo automático.
-- 6.8 PPS_STD (Pinheiro 880/1430, mig 002) y DPS_STD (Musiek, 60 secuencias, mig 002) NO se incluyeron en pac-patterns-v1 — agregar en pac-patterns-v2 si se quiere mantener compatibilidad histórica.
-- 6.9 Plantillas de reporte custom por pack (markdown con placeholders).
+- ✅ 6.5 Bootstrap primer arranque: `<BootstrapDialog>` bloqueante tras schema ok si `settings.bootstrap_done != '1'`. Fetch `index.json`, checkboxes pre-marcados para `pac-patterns-v1`/`pac-limens-v1`/`pac-temporal-v1`, botón "Todos/Ninguno", "Omitir e instalar luego" (marca done sin instalar). Progreso por pack. Integrado en `App.tsx`.
+- ✅ 6.6 Ficha rica del pack (`<PackDetailDialog>`): modal con markdown render (`src/lib/markdown.tsx`, parser propio sin deps), lista de tests/listas incluidos con códigos y categorías, interpretación, referencias, autor. Botón "Detalle" en `<PacksSection>` abre el modal con install/uninstall integrados.
+- ✅ 6.7 Interpretación dinámica en `SessionReportPage`: `getPackForTemplate(template_id)` via JOIN packs, `pickNormBand(age)`, `evaluateNorm(metric, value, band)` con direcciones correctas (higher-better para `accuracy_pct`/`asymmetry_pct`, lower-better para `srt_db`/`gap_ms`). Card "Normativa clínica" con banda matched, umbrales legibles, verdict badge, `description_md` y referencias colapsables. Auto-verdict solo cuando el valor es derivable de `test_score` (accuracy/asymmetry); otras métricas muestran tabla para interpretación manual.
+- ✅ 6.8 PPS_STD (Pinheiro 880/1430) y DPS_STD (Musiek, 60 secuencias) publicados como packs independientes `pps-pinheiro-v1` y `dps-musiek-v1` en el repo assets (alternativa más limpia que pac-patterns-v2 — cada test estándar histórico en su propio pack).
+- ✅ 6.9 Plantillas reporte custom por pack. Campo opcional `report_template_md` en `PackManifest` → almacenado dentro de `packs.metadata_json` (sin nueva migración). Placeholders soportados: `{{patient_name}}`, `{{patient_age}}`, `{{test_name}}`, `{{test_code}}`, `{{date}}`, `{{ear}}`, `{{examiner}}`, `{{accuracy_pct}}`, `{{correct}}`, `{{total}}`, `{{verdict}}`, `{{rt_mean_ms}}`, `{{rt_median_ms}}`, `{{asymmetry_pct}}`, `{{metric_value}}`, `{{norm_band}}`, `{{pack_name}}`, `{{pack_version}}`. `fillReportTemplate()` resuelve placeholders; faltantes → `—`. `<PackReportTemplateCard>` en `SessionReportPage` renderiza markdown narrativo. Ejemplo publicado en `pac-patterns-v1` v1.1.0.
 
 #### 6.X (propuesta original — para referencia)
 

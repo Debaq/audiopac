@@ -11,6 +11,12 @@ import { getProfile } from '@/lib/db/profiles'
 import { generateReportPdf, generateSessionCsv, type ReportData } from '@/lib/pdf/report'
 import { formatDateTime, percent, calculateAge, formatDate, cn } from '@/lib/utils'
 import { analyzeSession, type SessionAnalysis } from '@/lib/analysis/report'
+import {
+  getPackForTemplate, pickNormBand, evaluateNorm, bandLabel, deriveMetricValue,
+  fillReportTemplate,
+  type TemplatePackInfo, type Verdict,
+} from '@/lib/packs/interpretation'
+import { Markdown } from '@/lib/markdown'
 import { save } from '@tauri-apps/plugin-dialog'
 import { writeFile } from '@tauri-apps/plugin-fs'
 
@@ -18,18 +24,21 @@ export function SessionReportPage() {
   const { sessionId } = useParams()
   const sid = Number(sessionId)
   const [data, setData] = useState<ReportData | null>(null)
+  const [packInfo, setPackInfo] = useState<TemplatePackInfo | null>(null)
 
   useEffect(() => {
     (async () => {
       const s = await getSession(sid)
       if (!s) return
-      const [t, p, responses, profile] = await Promise.all([
+      const [t, p, responses, profile, pack] = await Promise.all([
         getTemplate(s.template_id),
         getPatient(s.patient_id),
         listResponses(sid),
         getProfile(s.profile_id),
+        getPackForTemplate(s.template_id),
       ])
       if (t && p && profile) setData({ session: s, template: t, patient: p, responses, profile })
+      setPackInfo(pack)
     })()
   }, [sid])
 
@@ -310,6 +319,29 @@ export function SessionReportPage() {
         </Card>
       )}
 
+      {packInfo?.interpretation && (
+        <PackNormsCard pack={packInfo} patientAge={calculateAge(patient.birth_date)} testScore={session.test_score ?? null} />
+      )}
+
+      {packInfo?.report_template_md && (
+        <PackReportTemplateCard
+          pack={packInfo}
+          template={template.name}
+          templateCode={template.code}
+          patientName={`${patient.first_name} ${patient.last_name}`}
+          patientAge={calculateAge(patient.birth_date)}
+          date={formatDateTime(session.started_at)}
+          ear={session.ear}
+          examiner={profile.name}
+          accuracy={session.test_score ?? null}
+          correct={session.correct_items ?? 0}
+          total={session.total_items ?? 0}
+          verdict={verdictMeta.label}
+          rtMean={analysis.test.rt.mean}
+          rtMedian={analysis.test.rt.median}
+        />
+      )}
+
       {session.notes && (
         <Card>
           <CardHeader><CardTitle className="text-base">Observaciones del evaluador</CardTitle></CardHeader>
@@ -317,6 +349,149 @@ export function SessionReportPage() {
         </Card>
       )}
     </div>
+  )
+}
+
+function PackNormsCard({
+  pack, patientAge, testScore,
+}: {
+  pack: TemplatePackInfo
+  patientAge: number | null
+  testScore: number | null
+}) {
+  const interp = pack.interpretation!
+  const band = pickNormBand(interp.norms_by_age, patientAge)
+  const value = deriveMetricValue(interp.metric, testScore)
+  const verdict: Verdict | null = band && value !== null ? evaluateNorm(interp.metric, value, band) : null
+
+  const verdictMeta: Record<Verdict, { label: string; color: string }> = {
+    normal: { label: 'Dentro de norma', color: 'emerald' },
+    borderline: { label: 'Limítrofe', color: 'amber' },
+    abnormal: { label: 'Bajo la norma', color: 'red' },
+  }
+
+  const unit = interp.metric === 'accuracy_pct' || interp.metric === 'asymmetry_pct' ? '%'
+    : interp.metric === 'srt_db' ? ' dB'
+    : interp.metric === 'gap_ms' ? ' ms' : ''
+
+  return (
+    <Card className="mb-6 border-[var(--primary)]/30">
+      <CardHeader>
+        <CardTitle className="text-base flex items-center gap-2 flex-wrap">
+          Normativa clínica — {pack.name}
+          <Badge className="text-[10px]">v{pack.version}</Badge>
+          {verdict && (
+            <Badge className={`text-[10px] bg-${verdictMeta[verdict].color}-600 text-white`}>
+              {verdictMeta[verdict].label}
+            </Badge>
+          )}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3 text-sm">
+        <div className="flex flex-wrap gap-4 text-xs">
+          <div><span className="text-[var(--muted-foreground)]">Métrica:</span> <span className="font-mono">{interp.metric}</span></div>
+          {patientAge !== null && <div><span className="text-[var(--muted-foreground)]">Edad paciente:</span> {patientAge} años</div>}
+          {band && <div><span className="text-[var(--muted-foreground)]">Banda etaria:</span> {band.age_min}–{band.age_max} años</div>}
+          {value !== null && <div><span className="text-[var(--muted-foreground)]">Valor medido:</span> <span className="font-bold">{value.toFixed(1)}{unit}</span></div>}
+        </div>
+
+        {band ? (
+          <div className="p-2 rounded bg-[var(--secondary)]/50 text-xs">
+            <div className="font-semibold mb-1">Umbrales para esta banda</div>
+            <div>{bandLabel(interp.metric, band)}</div>
+          </div>
+        ) : (
+          <div className="text-xs text-amber-600 flex items-center gap-1.5">
+            <AlertTriangle className="w-3.5 h-3.5" /> Sin norma para esta edad. Interpretación manual requerida.
+          </div>
+        )}
+
+        {value === null && (
+          <div className="text-xs text-[var(--muted-foreground)] italic">
+            Métrica "{interp.metric}" no se deriva automáticamente del score global. Interpretar manualmente desde los resultados de la sesión.
+          </div>
+        )}
+
+        {interp.description_md && (
+          <div className="text-xs text-[var(--muted-foreground)] whitespace-pre-wrap leading-relaxed">
+            {interp.description_md}
+          </div>
+        )}
+
+        {pack.references && pack.references.length > 0 && (
+          <details className="text-[11px]">
+            <summary className="cursor-pointer text-[var(--muted-foreground)] hover:text-[var(--foreground)]">Referencias ({pack.references.length})</summary>
+            <ul className="mt-1.5 space-y-1 pl-4 list-disc">
+              {pack.references.map((r, i) => (
+                <li key={i} className="text-[var(--muted-foreground)]">
+                  {r.citation}
+                  {r.url && <a href={r.url} target="_blank" rel="noreferrer" className="underline ml-1">link</a>}
+                </li>
+              ))}
+            </ul>
+          </details>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
+function PackReportTemplateCard({
+  pack, template, templateCode, patientName, patientAge, date, ear, examiner,
+  accuracy, correct, total, verdict, rtMean, rtMedian,
+}: {
+  pack: TemplatePackInfo
+  template: string
+  templateCode: string
+  patientName: string
+  patientAge: number | null
+  date: string
+  ear: string
+  examiner: string
+  accuracy: number | null
+  correct: number
+  total: number
+  verdict: string
+  rtMean: number | null
+  rtMedian: number | null
+}) {
+  const interp = pack.interpretation
+  const band = interp ? pickNormBand(interp.norms_by_age, patientAge) : null
+  const metricValue = interp ? deriveMetricValue(interp.metric, accuracy) : null
+  const accuracyPct = accuracy !== null ? (accuracy * 100).toFixed(1) : null
+  const asymmetryPct = interp?.metric === 'asymmetry_pct' && accuracy !== null ? (accuracy * 100).toFixed(1) : null
+
+  const ctx: Record<string, string | number | null> = {
+    patient_name: patientName,
+    patient_age: patientAge,
+    test_name: template,
+    test_code: templateCode,
+    date,
+    ear,
+    examiner,
+    accuracy_pct: accuracyPct,
+    correct,
+    total,
+    verdict,
+    rt_mean_ms: rtMean !== null ? Math.round(rtMean) : null,
+    rt_median_ms: rtMedian !== null ? Math.round(rtMedian) : null,
+    asymmetry_pct: asymmetryPct,
+    srt_db: null,
+    metric_value: metricValue !== null ? metricValue.toFixed(1) : null,
+    norm_band: band ? `${band.age_min}–${band.age_max}` : null,
+    pack_name: pack.name,
+    pack_version: pack.version,
+  }
+
+  const filled = fillReportTemplate(pack.report_template_md!, ctx)
+
+  return (
+    <Card className="mb-6 border-[var(--primary)]/30">
+      <CardHeader><CardTitle className="text-base">Informe narrativo — {pack.name}</CardTitle></CardHeader>
+      <CardContent>
+        <Markdown source={filled} />
+      </CardContent>
+    </Card>
   )
 }
 

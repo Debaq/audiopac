@@ -19,6 +19,12 @@ export interface PacksIndex {
   packs: PacksIndexEntry[]
 }
 
+function serializePackMetadata(manifest: PackManifest): string | null {
+  const merged: Record<string, unknown> = { ...(manifest.metadata ?? {}) }
+  if (manifest.report_template_md) merged.report_template_md = manifest.report_template_md
+  return Object.keys(merged).length > 0 ? JSON.stringify(merged) : null
+}
+
 async function sha256Hex(bytes: Uint8Array): Promise<string> {
   const h = await crypto.subtle.digest('SHA-256', bytes as any)
   return Array.from(new Uint8Array(h))
@@ -91,7 +97,7 @@ export async function installPack(
         JSON.stringify(manifest.author),
         manifest.references ? JSON.stringify(manifest.references) : null,
         manifest.interpretation ? JSON.stringify(manifest.interpretation) : null,
-        manifest.metadata ? JSON.stringify(manifest.metadata) : null,
+        serializePackMetadata(manifest),
         source.url, source.sha256, existing.id,
       ],
     )
@@ -109,7 +115,7 @@ export async function installPack(
         JSON.stringify(manifest.author),
         manifest.references ? JSON.stringify(manifest.references) : null,
         manifest.interpretation ? JSON.stringify(manifest.interpretation) : null,
-        manifest.metadata ? JSON.stringify(manifest.metadata) : null,
+        serializePackMetadata(manifest),
         source.url, source.sha256,
       ],
     )

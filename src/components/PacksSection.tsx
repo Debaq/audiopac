@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Package, Download, Trash2, AlertTriangle, Check, RefreshCw, Mic, Music, FileAudio } from 'lucide-react'
+import { Package, Download, Trash2, AlertTriangle, Check, RefreshCw, Mic, Music, FileAudio, Info } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -8,7 +8,7 @@ import {
   type PacksIndex, type InstalledPack,
 } from '@/lib/packs/installer'
 import type { PacksIndexEntry, PackRequirements } from '@/lib/packs/types'
-import { ASSETS_RAW } from '@/lib/assets/catalogs'
+import { PackDetailDialog } from '@/components/PackDetailDialog'
 
 const REQ_LABEL: Record<PackRequirements, { icon: typeof Mic; text: string; color: string }> = {
   ninguno: { icon: Music, text: 'Listo para usar', color: 'text-emerald-600' },
@@ -22,6 +22,7 @@ export function PacksSection() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
+  const [detail, setDetail] = useState<PacksIndexEntry | null>(null)
 
   const load = async () => {
     setLoading(true); setError(null)
@@ -140,20 +141,30 @@ export function PacksSection() {
                         <Trash2 className="w-3.5 h-3.5" /> Desinstalar
                       </Button>
                     )}
-                    <a
-                      href={`${ASSETS_RAW}/${p.url}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-[10px] underline self-center text-[var(--muted-foreground)] ml-auto"
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setDetail(p)}
+                      disabled={!!busy}
+                      className="ml-auto"
                     >
-                      ver JSON
-                    </a>
+                      <Info className="w-3.5 h-3.5" /> Detalle
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
             )
           })}
         </div>
+      )}
+
+      {detail && (
+        <PackDetailDialog
+          entry={detail}
+          installedVersion={installed[detail.id]?.version ?? null}
+          onClose={() => setDetail(null)}
+          onChange={load}
+        />
       )}
     </div>
   )

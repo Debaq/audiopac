@@ -92,6 +92,14 @@ export interface PackManifest {
   /** Para sharvard-es-v1: apunta a un catalogo existente con las listas. */
   lists_ref?: string
   interpretation?: PackInterpretation | null
+  /**
+   * Markdown con placeholders que se renderiza en `SessionReportPage`.
+   * Placeholders soportados: `{{patient_name}}`, `{{patient_age}}`, `{{test_name}}`,
+   * `{{test_code}}`, `{{date}}`, `{{ear}}`, `{{examiner}}`, `{{accuracy_pct}}`,
+   * `{{correct}}`, `{{total}}`, `{{verdict}}`, `{{rt_mean_ms}}`, `{{rt_median_ms}}`,
+   * `{{asymmetry_pct}}`, `{{srt_db}}`, `{{metric_value}}`, `{{norm_band}}`.
+   */
+  report_template_md?: string
   metadata?: Record<string, unknown>
 }
 
