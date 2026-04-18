@@ -441,22 +441,22 @@ Redactar `purpose_md` / `how_it_works_md` / `protocol_md` / `target_population_m
 | Pack | Tests | Estado |
 |---|---:|---|
 | `pac-patterns-v1` | 6 | ✅ v1.2.0 (FPT_STD, PPS_LONG, DPT_LONG, MEM_SEQ_5/6/7) |
-| `pac-limens-v1` | 6 | ⬜ pendiente |
-| `pac-temporal-v1` | 5 | ⬜ pendiente |
-| `pac-binaural-v1` | 3 | ⬜ pendiente |
-| `pac-noise-v1` | 5 | ⬜ pendiente |
-| `pac-mld-v1` | 1 | ⬜ pendiente |
-| `logoaud-latam-v1` | 1 | ⬜ pendiente |
-| `logoaud-us-es-v1` | 1 | ⬜ pendiente |
-| `dichotic-digits-es-v1` | 2 | ⬜ pendiente |
-| `hint-es-v1` | 1 | ⬜ pendiente |
-| `sharvard-es-v1` | 1 | ⬜ pendiente |
-| `sinb-es-v1` | 1 | ⬜ pendiente |
-| `palpa-es-v1` | — | ⬜ pendiente (pack de listas) |
-| `matrix-es-v1` | 1 | ⬜ pendiente |
-| `hint-es-clinico-v1` | 70 | ⬜ pendiente (reusar plantilla Sharvard) |
-| `pps-pinheiro-v1` | 1 | ⬜ pendiente |
-| `dps-musiek-v1` | 1 | ⬜ pendiente |
+| `pac-limens-v1` | 6 | ✅ v1.1.0 (DLF/DLD/DLI screening+fine con refs Moore/Abel/Jesteadt/Tallal) |
+| `pac-temporal-v1` | 5 | ✅ v1.1.0 (GAP 20/10/5, TOJ 100/40, FGC con refs Plomp/Hirsh/Musiek/Tallal) |
+| `pac-binaural-v1` | 3 | ✅ v1.1.0 (ILD_LAT, DICHOTIC_NV, FUSION_BIN con refs Kimura/Matzker/Musiek/Blauert/Mills) |
+| `pac-noise-v1` | 5 | ✅ v1.1.0 (GIN, RGD 20/10/5, NBN con refs Musiek/Keith/Shinn/Bamiou) |
+| `pac-mld-v1` | 1 | ✅ v1.1.0 (MLD 500 Hz con refs Hirsh/Licklider/Durlach/Wilson/Noffsinger, marcador tronco bajo/EM) |
+| `logoaud-latam-v1` | 1 | ✅ v1.1.0 (SRT bisílabos con método Hughson-Westlake/Carhart-Jerger, refs Tato/ASHA/Wilson) |
+| `logoaud-us-es-v1` | 1 | ✅ v1.1.0 (SRT español US con léxico Lipski/Corpus del Español, refs McCullough/Wilson) |
+| `dichotic-digits-es-v1` | 2 | ✅ v1.1.0 (FREE/DIRECTED con refs Musiek 1983/1991, Kimura, Strouse-Wilson, Jerger-Martin) |
+| `hint-es-v1` | 1 | ✅ v1.1.0 (HINT SRT-SNR con refs Nilsson/Killion/Humes/Huarte, ruido rosa) |
+| `sharvard-es-v1` | 1 | ✅ v1.1.0 (HINT Sharvard L01 con refs Aubanel/Nilsson/IEEE, balance fonémico) |
+| `sinb-es-v1` | 1 | ✅ v1.1.0 (SRT en SSN con refs Killion/Byrne/Hochmuth, figura-fondo) |
+| `palpa-es-v1` | — | ✅ v1.1.0 (pack listas con refs Kay-Lesser-Coltheart/Valle-Cuetos/Ellis-Young/Franklin) |
+| `matrix-es-v1` | 1 | ✅ v1.1.0 (Matrix 5-AFC con refs Hochmuth/Kollmeier, test-retest ±1 dB) |
+| `hint-es-clinico-v1` | 70 | ✅ v1.1.0 (descripción clínica extendida con refs Aubanel/Nilsson/Soli-Wong/Hall) |
+| `pps-pinheiro-v1` | 1 | ✅ v1.1.0 (PPS estándar 880/1430 Hz con refs Pinheiro/Musiek) |
+| `dps-musiek-v1` | 1 | ✅ v1.1.0 (DPS estándar 500/250 ms con refs Musiek-Baran-Pinheiro/Bellis) |
 
 **Otros pendientes UX:**
 
