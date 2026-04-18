@@ -434,9 +434,32 @@ Refactor de la página de tests para ir **más allá** de buscador+chips: organi
 - ✅ **`TestsPage` refactorizada**: layout 2-columnas (340px árbol + panel detalle), 78vh max-height con scroll independiente. Switch de vista (`FilterChips`): **Plano / Por pack / Por familia**. Selector de orden (nombre / código / más recientes / tipo). Filtros tipo + origen preservados. Grupos colapsables con chevron. Personalizados siempre como grupo separado al final. Selección persistida en URL via `?id=`.
 - ✅ **Param `?template=` en `EvaluationHomePage`**: al hacer click en "Iniciar evaluación" desde la ficha, se prellena el selector de test.
 
-**Pendiente (contenido, no código):**
+**Pendiente (contenido clínico por pack):**
 
-- Redactar `purpose_md` / `how_it_works_md` / `protocol_md` / `target_population_md` / `contraindications_md` / `references` para los 14 packs existentes y re-publicar en `audiopac-assets`. Cada pack se actualiza independiente; al reinstalar en app, la ficha se completa sola.
+Redactar `purpose_md` / `how_it_works_md` / `protocol_md` / `target_population_md` / `contraindications_md` / `family` / `min_age_years` / `max_age_years` / `estimated_duration_min` / `references` para cada test y re-publicar en `audiopac-assets`. Cada pack sube de versión independiente; al reinstalar en app, la ficha se completa sola.
+
+| Pack | Tests | Estado |
+|---|---:|---|
+| `pac-patterns-v1` | 6 | ✅ v1.2.0 (FPT_STD, PPS_LONG, DPT_LONG, MEM_SEQ_5/6/7) |
+| `pac-limens-v1` | 6 | ⬜ pendiente |
+| `pac-temporal-v1` | 5 | ⬜ pendiente |
+| `pac-binaural-v1` | 3 | ⬜ pendiente |
+| `pac-noise-v1` | 5 | ⬜ pendiente |
+| `pac-mld-v1` | 1 | ⬜ pendiente |
+| `logoaud-latam-v1` | 1 | ⬜ pendiente |
+| `logoaud-us-es-v1` | 1 | ⬜ pendiente |
+| `dichotic-digits-es-v1` | 2 | ⬜ pendiente |
+| `hint-es-v1` | 1 | ⬜ pendiente |
+| `sharvard-es-v1` | 1 | ⬜ pendiente |
+| `sinb-es-v1` | 1 | ⬜ pendiente |
+| `palpa-es-v1` | — | ⬜ pendiente (pack de listas) |
+| `matrix-es-v1` | 1 | ⬜ pendiente |
+| `hint-es-clinico-v1` | 70 | ⬜ pendiente (reusar plantilla Sharvard) |
+| `pps-pinheiro-v1` | 1 | ⬜ pendiente |
+| `dps-musiek-v1` | 1 | ⬜ pendiente |
+
+**Otros pendientes UX:**
+
 - Sugerencias de tests relacionados por familia (requiere contenido clínico primero).
 - Persistir preferencia de vista/orden en `settings` (hoy reset al recargar; selección de test sí persiste via URL).
 - Stats "último uso" / "frecuencia" (requieren JOIN con `test_sessions`).
