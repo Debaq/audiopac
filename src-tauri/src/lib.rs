@@ -2,32 +2,56 @@ mod migrations;
 
 use tauri::{AppHandle, Manager};
 
-/// Borra la base de datos y el directorio de estímulos, luego reinicia la app.
-/// Se invoca desde el modal de "Base de datos incompatible" en el frontend.
+/// Borra la base de datos y el directorio de estímulos, luego sale.
+/// El usuario reabre la app manualmente; al hacerlo el schema v2 se crea limpio.
+///
+/// La DB de tauri-plugin-sql vive en `app_config_dir` (NO en `app_data_dir`).
+/// Los audios grabados (stimuli/) viven en `app_data_dir` via plugin-fs.
+/// Borramos ambos caminos por las dudas.
 #[tauri::command]
-fn reset_database(app: AppHandle) -> Result<(), String> {
-    let app_data = app
-        .path()
-        .app_data_dir()
-        .map_err(|e| format!("no app_data_dir: {e}"))?;
+fn reset_database(app: AppHandle) -> Result<String, String> {
+    let mut report = Vec::<String>::new();
 
-    let db_path = app_data.join("audiopac.db");
-    if db_path.exists() {
-        std::fs::remove_file(&db_path).map_err(|e| format!("rm db: {e}"))?;
-    }
-    for ext in ["-shm", "-wal"] {
-        let sidecar = app_data.join(format!("audiopac.db{ext}"));
-        if sidecar.exists() {
-            let _ = std::fs::remove_file(&sidecar);
+    let candidates = [
+        app.path().app_config_dir().ok(),
+        app.path().app_data_dir().ok(),
+        app.path().app_local_data_dir().ok(),
+    ];
+
+    for dir_opt in candidates.iter().flatten() {
+        let db = dir_opt.join("audiopac.db");
+        if db.exists() {
+            match std::fs::remove_file(&db) {
+                Ok(_) => report.push(format!("rm {}", db.display())),
+                Err(e) => report.push(format!("ERR rm {}: {}", db.display(), e)),
+            }
+        }
+        for ext in ["-shm", "-wal"] {
+            let sidecar = dir_opt.join(format!("audiopac.db{ext}"));
+            if sidecar.exists() {
+                let _ = std::fs::remove_file(&sidecar);
+                report.push(format!("rm {}", sidecar.display()));
+            }
         }
     }
 
-    let stimuli = app_data.join("stimuli");
-    if stimuli.exists() {
-        let _ = std::fs::remove_dir_all(&stimuli);
+    if let Ok(app_data) = app.path().app_data_dir() {
+        let stimuli = app_data.join("stimuli");
+        if stimuli.exists() {
+            match std::fs::remove_dir_all(&stimuli) {
+                Ok(_) => report.push(format!("rmdir {}", stimuli.display())),
+                Err(e) => report.push(format!("ERR rmdir {}: {}", stimuli.display(), e)),
+            }
+        }
     }
 
-    app.restart();
+    let summary = report.join("\n");
+    eprintln!("[reset_database]\n{summary}");
+
+    // En vez de app.restart(): salir limpio. En dev mode el restart no logra
+    // reconectar con vite. El user reabre y la migración v2 corre fresca.
+    app.exit(0);
+    Ok(summary)
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
