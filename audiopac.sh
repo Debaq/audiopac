@@ -210,10 +210,15 @@ collect_artifacts() {
     fi
 
     if [[ -d "$BUNDLE_DIR" ]]; then
+        # Filtrar solo artefactos de AudioPAC (CARGO_TARGET_DIR es compartido)
+        local patterns=("AudioPAC*" "audiopac*" "audio-pac*")
         for type in deb rpm appimage msi nsis dmg; do
-            if [[ -d "$BUNDLE_DIR/$type" ]]; then
-                cp -r "$BUNDLE_DIR/$type"/* "$out/" 2>/dev/null || true
-            fi
+            [[ -d "$BUNDLE_DIR/$type" ]] || continue
+            for pat in "${patterns[@]}"; do
+                for item in "$BUNDLE_DIR/$type"/$pat; do
+                    [[ -e "$item" ]] && cp -r "$item" "$out/" 2>/dev/null || true
+                done
+            done
         done
     fi
 
