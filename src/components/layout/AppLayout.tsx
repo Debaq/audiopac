@@ -3,6 +3,7 @@ import { Users, Activity, Settings2, FileText, LogOut, Home, AudioLines, Gauge, 
 import { useAuth } from '@/stores/auth'
 import { useCalibrationStore } from '@/stores/calibration'
 import { usePackUpdatesStore } from '@/stores/packUpdates'
+import { CommandPalette } from '@/components/CommandPalette'
 import { cn } from '@/lib/utils'
 
 const navItems = [
@@ -151,6 +152,7 @@ export function AppLayout() {
       <main className="flex-1 overflow-auto">
         <Outlet />
       </main>
+      <CommandPalette />
     </div>
   )
 }

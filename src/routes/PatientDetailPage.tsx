@@ -1,14 +1,22 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, Edit2, Trash2, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { SearchBar } from '@/components/ui/SearchBar'
+import { FilterChips, type ChipOption } from '@/components/ui/FilterChips'
 import { PatientForm } from '@/components/layout/PatientForm'
 import { getPatient, deletePatient } from '@/lib/db/patients'
 import { listSessionsByPatient } from '@/lib/db/sessions'
-import type { Patient, SessionWithDetails } from '@/types'
+import type { Patient, SessionWithDetails, SessionStatus } from '@/types'
 import { calculateAge, formatDate, formatDateTime, percent } from '@/lib/utils'
+
+type StatusFilter = 'all' | SessionStatus
+
+function norm(s: string): string {
+  return s.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '')
+}
 
 export function PatientDetailPage() {
   const { id } = useParams()
@@ -17,6 +25,30 @@ export function PatientDetailPage() {
   const [patient, setPatient] = useState<Patient | null>(null)
   const [sessions, setSessions] = useState<SessionWithDetails[]>([])
   const [editing, setEditing] = useState(false)
+  const [query, setQuery] = useState('')
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
+
+  const counts = useMemo(() => {
+    const m: Record<string, number> = { all: sessions.length, completed: 0, in_progress: 0, cancelled: 0 }
+    for (const s of sessions) m[s.status] = (m[s.status] ?? 0) + 1
+    return m
+  }, [sessions])
+
+  const statusOptions: ChipOption<StatusFilter>[] = [
+    { value: 'all', label: 'Todos', count: counts.all },
+    { value: 'completed', label: 'Completados', count: counts.completed },
+    { value: 'in_progress', label: 'En curso', count: counts.in_progress },
+    { value: 'cancelled', label: 'Cancelados', count: counts.cancelled },
+  ]
+
+  const filtered = useMemo(() => {
+    const nq = query.trim() ? norm(query.trim()) : ''
+    return sessions.filter(s => {
+      if (statusFilter !== 'all' && s.status !== statusFilter) return false
+      if (!nq) return true
+      return norm(s.template_name).includes(nq) || norm(s.profile_name ?? '').includes(nq)
+    })
+  }, [sessions, query, statusFilter])
 
   const load = async () => {
     const [p, s] = await Promise.all([getPatient(patientId), listSessionsByPatient(patientId)])
@@ -85,11 +117,20 @@ export function PatientDetailPage() {
         </Link>
       </div>
 
+      {sessions.length > 0 && (
+        <div className="mb-3 space-y-2">
+          <SearchBar value={query} onChange={setQuery} placeholder="Buscar por test o evaluador..." />
+          <FilterChips options={statusOptions} value={statusFilter} onChange={setStatusFilter} />
+        </div>
+      )}
+
       {sessions.length === 0 ? (
         <Card><CardContent className="py-8 text-center text-[var(--muted-foreground)]">Sin evaluaciones aún</CardContent></Card>
+      ) : filtered.length === 0 ? (
+        <Card><CardContent className="py-8 text-center text-[var(--muted-foreground)]">Sin coincidencias</CardContent></Card>
       ) : (
         <div className="space-y-2">
-          {sessions.map(s => (
+          {filtered.map(s => (
             <Link key={s.id} to={`/informes/${s.id}`}>
               <Card className="hover:border-[var(--primary)] transition-colors">
                 <CardContent className="p-4 flex items-center justify-between">

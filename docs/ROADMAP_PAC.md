@@ -414,13 +414,12 @@ Objetivo: unificar búsqueda/filtrado en páginas con listas acumulativas. Inspi
 
 Antes el flujo "nueva evaluación sin paciente pre-existente" requería: `/evaluacion` → "ah no está" → ir a `/pacientes` → "nuevo paciente" → llenar → volver a `/evaluacion` → buscar en select → continuar. Ahora: se tipea el nombre en el combobox, el dropdown ofrece "crear con este nombre", modal inline, al guardar queda seleccionado automáticamente y el flujo sigue. Cero navegación lateral.
 
-### 8.4 Pendiente UX (fuera de esta tanda)
+### 8.4 UX complementaria ✅ hecho
 
-- Ordenamiento (fecha/nombre) en `ReportsPage`.
-- Búsqueda en `/pacientes/:id` (histórico sesiones del paciente).
-- Paginación real en `ReportsPage` (hoy `LIMIT 500` hardcoded).
-- Filtros en `PatientDetailPage` para histórico de tests del paciente.
-- Atajos teclado globales (`Ctrl+K` spotlight de búsqueda unificada paciente+test+pack).
+- ✅ **Ordenamiento en `ReportsPage`**: selector con `date_desc` / `date_asc` / `patient_asc` / `test_asc` / `score_desc`. Reset a página 1 al cambiar.
+- ✅ **Paginación en `ReportsPage`**: page size 25, navegación Anterior/Siguiente, contador "Página X de Y · mostrando N de M". Load limit 2000 (aviso si se alcanza).
+- ✅ **Búsqueda y filtros en `/pacientes/:id`**: `SearchBar` por test/evaluador + `FilterChips` estado (todos/completados/en curso/cancelados) sobre el histórico del paciente.
+- ✅ **Spotlight global `Ctrl+K`** (`src/components/CommandPalette.tsx`): modal con backdrop blur, busca en paralelo pacientes + tests + últimos 200 informes + paquetes instalados. Normaliza acentos (NFD). Navegación teclado (↑↓ Enter Esc), hover-to-select, grupo visible por ítem (ícono + badge). Montado en `AppLayout`, listener global `keydown` con `Ctrl+K` / `Cmd+K`. Enter navega a `/pacientes/:id`, `/tests/:id`, `/informes/:id` o `/catalogos` según tipo.
 
 ### 8.5 Pendiente — Mejoras profundas en `/tests`
 
