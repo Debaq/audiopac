@@ -74,5 +74,11 @@ pub fn get_migrations() -> Vec<Migration> {
             sql: include_str!("../migrations/013_seed_srt.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 14,
+            description: "seed_dichotic_digits",
+            sql: include_str!("../migrations/014_seed_dichotic_digits.sql"),
+            kind: MigrationKind::Up,
+        },
     ]
 }

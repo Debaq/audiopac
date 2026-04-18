@@ -153,7 +153,8 @@ Objetivo: que los dB reportados sean dB SPL reales, no pseudo-calibrados.
 - Denoise espectral
 - Trim automático robusto
 - Biblioteca de listas estándar (PAL, PALPA, HINT-ES)
-- Dichotic Digits ES, SSW adaptado, SinB-ES
+- ✅ **Dichotic Digits ES** (migración 014). Plantillas `DD_ES_FREE` (recuerdo libre) y `DD_ES_DIRECTED` (recuerdo dirigido alternando oído inicial). Usa `playStimulusPair` en `engine.ts` para disparar dos `AudioBuffer` simultáneos con mismo `startTime` (uno por oído). Lista `DICHOTIC_DIGITS_ES` (mig 012) con dígitos 1–9 excluyendo "siete". Scoring por oído con asimetría (R − L). Pares configurables (default 20 pares · 2 dígitos/oído · 55 dB HL).
+- SSW adaptado, SinB-ES (pendiente)
 
 ### Fase 5 — Ruido (bonus) ✅ parcial (migración 007)
 - ✅ Generador de ruido blanco (buffer random en loop)

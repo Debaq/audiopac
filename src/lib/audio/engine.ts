@@ -483,6 +483,70 @@ export async function playStimulusBuffer(
   return () => { try { src.stop() } catch {} }
 }
 
+/**
+ * Reproduce dos AudioBuffer simultáneos, uno por oído, sincronizados (mismo startTime).
+ * Pensado para Dichotic Digits: digitoL al L y digitoR al R. Cada uno con su propio
+ * rms_dbfs y al mismo level_db SPL por oído. Llama onEnd cuando el MÁS LARGO termina.
+ */
+export async function playStimulusPair(
+  bufferL: AudioBuffer,
+  bufferR: AudioBuffer,
+  level_db: number,
+  opts: {
+    rms_dbfs_l?: number | null
+    rms_dbfs_r?: number | null
+    refDb?: number
+    onEnd?: () => void
+  } = {}
+): Promise<() => void> {
+  const ctx = await ensureRunning()
+  const rmsL = opts.rms_dbfs_l ?? -20
+  const rmsR = opts.rms_dbfs_r ?? -20
+  const ref = opts.refDb ?? resolveRefDb(1000, 'binaural')
+  const gainL = dbToGain(level_db - rmsL, ref)
+  const gainR = dbToGain(level_db - rmsR, ref)
+
+  const merger = ctx.createChannelMerger(2)
+
+  const srcL = ctx.createBufferSource()
+  srcL.buffer = bufferL
+  const gL = ctx.createGain()
+  gL.gain.value = gainL
+  srcL.connect(gL)
+  gL.connect(merger, 0, 0)
+
+  const srcR = ctx.createBufferSource()
+  srcR.buffer = bufferR
+  const gR = ctx.createGain()
+  gR.gain.value = gainR
+  srcR.connect(gR)
+  gR.connect(merger, 0, 1)
+
+  merger.connect(ctx.destination)
+
+  const startAt = ctx.currentTime + 0.05
+  const longer = Math.max(bufferL.duration, bufferR.duration)
+  let fired = false
+  const fireEnd = () => {
+    if (fired) return
+    fired = true
+    opts.onEnd?.()
+  }
+  const longerSrc = bufferL.duration >= bufferR.duration ? srcL : srcR
+  longerSrc.onended = fireEnd
+
+  srcL.start(startAt)
+  srcR.start(startAt)
+  // Safety: si onended no dispara (ej. stop temprano)
+  const safetyTimer = setTimeout(fireEnd, (0.05 + longer + 0.1) * 1000)
+
+  return () => {
+    clearTimeout(safetyTimer)
+    try { srcL.stop() } catch { /* ya detenido */ }
+    try { srcR.stop() } catch { /* ya detenido */ }
+  }
+}
+
 let stimulusBufferCache = new Map<string, AudioBuffer>()
 
 export async function loadStimulusBuffer(absPath: string, bytes: Uint8Array): Promise<AudioBuffer> {

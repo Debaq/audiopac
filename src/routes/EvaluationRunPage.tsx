@@ -12,6 +12,7 @@ import { TestRunner, type RunnerState } from '@/lib/audio/runner'
 import { ensureRunning, type CalibCurvePoint } from '@/lib/audio/engine'
 import { useKeyboard, Kbd } from '@/hooks/useKeyboard'
 import { SRTRun } from '@/components/SRTRun'
+import { DichoticDigitsRun } from '@/components/DichoticDigitsRun'
 import type { TestSession, TestTemplateParsed, Patient } from '@/types'
 import { percent, cn } from '@/lib/utils'
 
@@ -43,6 +44,7 @@ export function EvaluationRunPage() {
       setTemplate(t)
       setPatient(p)
       if (t?.config.srt) return
+      if (t?.config.dichotic_digits) return
       if (t) {
         let curve: CalibCurvePoint[] | undefined
         if (s.calibration_curve_snapshot) {
@@ -158,6 +160,10 @@ export function EvaluationRunPage() {
 
   if (template.config.srt) {
     return <SRTRun session={session} template={template} patient={patient} params={template.config.srt} />
+  }
+
+  if (template.config.dichotic_digits) {
+    return <DichoticDigitsRun session={session} template={template} patient={patient} params={template.config.dichotic_digits} />
   }
 
   if (!state) {

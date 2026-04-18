@@ -69,6 +69,17 @@ export interface SRTParams {
   max_total_trials?: number
 }
 
+export type DichoticMode = 'free' | 'directed'
+
+export interface DichoticDigitsParams {
+  stimulus_list_code: string
+  num_pairs: number
+  digits_per_ear: number
+  isi_ms: number
+  level_db: number
+  mode: DichoticMode
+}
+
 export interface TestConfig {
   frequency?: number
   tones: Record<string, ToneDefinition>
@@ -82,6 +93,7 @@ export interface TestConfig {
   channel: Ear
   level_db: number
   srt?: SRTParams
+  dichotic_digits?: DichoticDigitsParams
 }
 
 export interface TestTemplate {

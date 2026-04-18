@@ -198,6 +198,20 @@ export function EvaluationHomePage() {
 }
 
 function TemplateSummary({ config }: { config: import('@/types').TestConfig }) {
+  if (config.dichotic_digits) {
+    const d = config.dichotic_digits
+    return (
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-sm">
+        <div><span className="text-[var(--muted-foreground)]">Modo:</span> Dichotic Digits</div>
+        <div><span className="text-[var(--muted-foreground)]">Lista:</span> {d.stimulus_list_code}</div>
+        <div><span className="text-[var(--muted-foreground)]">Pares:</span> {d.num_pairs}</div>
+        <div><span className="text-[var(--muted-foreground)]">Dígitos/oído:</span> {d.digits_per_ear}</div>
+        <div><span className="text-[var(--muted-foreground)]">ISI:</span> {d.isi_ms} ms</div>
+        <div><span className="text-[var(--muted-foreground)]">Nivel:</span> {d.level_db} dB HL</div>
+        <div><span className="text-[var(--muted-foreground)]">Recuerdo:</span> {d.mode === 'free' ? 'Libre' : 'Dirigido'}</div>
+      </div>
+    )
+  }
   if (config.srt) {
     const s = config.srt
     return (
