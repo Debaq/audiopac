@@ -20,6 +20,10 @@ export interface ProcessingOptions {
   vadMinSpeechMs?: number
   vadAbsFloorDbfs?: number
   vadZcrAssist?: boolean
+  denoise?: boolean
+  denoiseReductionDb?: number
+  denoiseGateThresholdDb?: number
+  denoiseNoisePercentile?: number
 }
 
 export const DEFAULT_PROC: Required<ProcessingOptions> = {
@@ -36,6 +40,10 @@ export const DEFAULT_PROC: Required<ProcessingOptions> = {
   vadMinSpeechMs: 30,
   vadAbsFloorDbfs: -50,
   vadZcrAssist: true,
+  denoise: true,
+  denoiseReductionDb: -12,
+  denoiseGateThresholdDb: 6,
+  denoiseNoisePercentile: 0.20,
 }
 
 export interface StimulusMetrics {
@@ -308,7 +316,17 @@ export async function processClip(
   const resampled = await resampleMono(input, o.targetSampleRate)
   const hpBuf = await applyHighpass(resampled, o.hpHz)
 
-  const srcData = hpBuf.getChannelData(0)
+  let workBuf = hpBuf
+  if (o.denoise) {
+    const { denoiseBuffer } = await import('./denoise')
+    workBuf = await denoiseBuffer(hpBuf, {
+      reductionDb: o.denoiseReductionDb,
+      gateThresholdDb: o.denoiseGateThresholdDb,
+      noisePercentile: o.denoiseNoisePercentile,
+    })
+  }
+
+  const srcData = workBuf.getChannelData(0)
   let bounds: [number, number] | null = null
   if (o.trimMethod === 'vad') {
     bounds = findVadBounds(srcData, hpBuf.sampleRate, {
