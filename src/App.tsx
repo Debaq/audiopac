@@ -2,12 +2,14 @@ import { useEffect, useState } from 'react'
 import { RouterProvider } from 'react-router-dom'
 import { router } from '@/router'
 import { useCalibrationStore } from '@/stores/calibration'
+import { usePackUpdatesStore } from '@/stores/packUpdates'
 import { checkSchemaEra, getSetting, type SchemaCheck } from '@/lib/db/client'
 import { SchemaIncompatibleDialog } from '@/components/SchemaIncompatibleDialog'
 import { BootstrapDialog } from '@/components/BootstrapDialog'
 
 function App() {
   const init = useCalibrationStore(s => s.init)
+  const refreshUpdates = usePackUpdatesStore(s => s.refresh)
   const [schema, setSchema] = useState<SchemaCheck | 'loading'>('loading')
   const [bootstrap, setBootstrap] = useState<'loading' | 'needed' | 'done'>('loading')
 
@@ -21,14 +23,15 @@ function App() {
       const done = await getSetting('bootstrap_done')
       if (cancelled) return
       setBootstrap(done === '1' ? 'done' : 'needed')
+      if (done === '1') refreshUpdates().catch(() => {})
     })
     return () => { cancelled = true }
-  }, [init])
+  }, [init, refreshUpdates])
 
   if (schema === 'loading') return null
   if (schema === 'incompatible') return <SchemaIncompatibleDialog />
   if (bootstrap === 'loading') return null
-  if (bootstrap === 'needed') return <BootstrapDialog onDone={() => setBootstrap('done')} />
+  if (bootstrap === 'needed') return <BootstrapDialog onDone={() => { setBootstrap('done'); refreshUpdates().catch(() => {}) }} />
   return <RouterProvider router={router} />
 }
 

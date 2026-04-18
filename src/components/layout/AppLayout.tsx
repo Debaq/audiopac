@@ -1,7 +1,8 @@
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
-import { Users, Activity, Settings2, FileText, LogOut, Home, AudioLines, Gauge, AlertTriangle, CheckCircle2, Mic, Package } from 'lucide-react'
+import { Users, Activity, Settings2, FileText, LogOut, Home, AudioLines, Gauge, AlertTriangle, CheckCircle2, Mic, Package, Download } from 'lucide-react'
 import { useAuth } from '@/stores/auth'
 import { useCalibrationStore } from '@/stores/calibration'
+import { usePackUpdatesStore } from '@/stores/packUpdates'
 import { cn } from '@/lib/utils'
 
 const navItems = [
@@ -18,6 +19,7 @@ const navItems = [
 export function AppLayout() {
   const { activeProfile, logout } = useAuth()
   const { active, status, ageDays } = useCalibrationStore()
+  const packUpdates = usePackUpdatesStore(s => s.updates)
   const navigate = useNavigate()
 
   const handleLogout = () => {
@@ -71,12 +73,40 @@ export function AppLayout() {
                     <span className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1 w-1 h-6 bg-[var(--primary)] rounded-r-full" />
                   )}
                   <Icon className={cn('w-4 h-4 transition-transform', isActive && 'scale-110')} strokeWidth={isActive ? 2.5 : 2} />
-                  <span>{label}</span>
+                  <span className="flex-1">{label}</span>
+                  {to === '/catalogos' && packUpdates.length > 0 && (
+                    <span
+                      className={cn(
+                        'text-[10px] font-bold rounded-full px-1.5 py-0.5 min-w-[18px] text-center',
+                        isActive ? 'bg-white/25 text-white' : 'bg-amber-500 text-white',
+                      )}
+                      title={`${packUpdates.length} paquete(s) con actualizaciones`}
+                    >
+                      {packUpdates.length}
+                    </span>
+                  )}
                 </>
               )}
             </NavLink>
           ))}
         </nav>
+
+        {packUpdates.length > 0 && (
+          <div className="px-3 pb-2">
+            <Link
+              to="/catalogos"
+              className="flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs border bg-amber-500/10 border-amber-500/40 text-amber-700 dark:text-amber-400 hover:bg-amber-500/15 transition-colors"
+              title={packUpdates.map(u => `${u.name}: v${u.installed} → v${u.latest}`).join('\n')}
+            >
+              <Download className="w-3.5 h-3.5 shrink-0" />
+              <span className="truncate">
+                {packUpdates.length === 1
+                  ? '1 paquete con actualización'
+                  : `${packUpdates.length} paquetes con actualizaciones`}
+              </span>
+            </Link>
+          </div>
+        )}
 
         <div className="px-3 pb-2">
           <Link

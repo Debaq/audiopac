@@ -9,6 +9,7 @@ import {
 } from '@/lib/packs/installer'
 import type { PacksIndexEntry, PackRequirements } from '@/lib/packs/types'
 import { PackDetailDialog } from '@/components/PackDetailDialog'
+import { usePackUpdatesStore } from '@/stores/packUpdates'
 
 const REQ_LABEL: Record<PackRequirements, { icon: typeof Mic; text: string; color: string }> = {
   ninguno: { icon: Music, text: 'Listo para usar', color: 'text-emerald-600' },
@@ -23,6 +24,7 @@ export function PacksSection() {
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [detail, setDetail] = useState<PacksIndexEntry | null>(null)
+  const refreshGlobal = usePackUpdatesStore(s => s.refresh)
 
   const load = async () => {
     setLoading(true); setError(null)
@@ -32,6 +34,7 @@ export function PacksSection() {
       const map: Record<string, InstalledPack> = {}
       for (const p of list) map[p.code] = p
       setInstalled(map)
+      refreshGlobal().catch(() => {})
     } catch (e) {
       setError((e as Error).message)
     } finally {
