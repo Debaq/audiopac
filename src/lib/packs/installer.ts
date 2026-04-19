@@ -20,10 +20,11 @@ export interface PacksIndex {
 }
 
 const TEST_META_FIELDS = [
-  'family', 'purpose_md', 'how_it_works_md', 'protocol_md',
-  'target_population_md', 'contraindications_md',
+  'family', 'purpose_md', 'how_it_works_md', 'neural_basis_md', 'scoring_md',
+  'protocol_md', 'target_population_md', 'contraindications_md',
   'estimated_duration_min', 'min_age_years', 'max_age_years',
   'references', 'attachments',
+  'investigative', 'investigative_reason_md',
 ] as const
 
 function extractTestsMeta(manifest: PackManifest): Record<string, Record<string, unknown>> | null {

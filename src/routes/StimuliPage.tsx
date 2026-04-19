@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Mic, Square, Play, Trash2, Plus, RefreshCw, Check, AlertTriangle, Globe, Scissors } from 'lucide-react'
+import { Mic, Square, Play, Trash2, Plus, RefreshCw, Check, AlertTriangle, Globe, Scissors, Layers } from 'lucide-react'
 import { StimulusEditDialog } from '@/components/StimulusEditDialog'
+import { BatchRecordDialog } from '@/components/BatchRecordDialog'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -63,6 +64,7 @@ export function StimuliPage() {
 
   const [showAllCountries, setShowAllCountries] = useState(false)
   const [editStimulus, setEditStimulus] = useState<Stimulus | null>(null)
+  const [batchOpen, setBatchOpen] = useState(false)
   const [recordingId, setRecordingId] = useState<number | null>(null)
   const recRef = useRef<Awaited<ReturnType<typeof startMicRecording>> | null>(null)
   const [busyId, setBusyId] = useState<number | null>(null)
@@ -405,6 +407,14 @@ export function StimuliPage() {
                     <Button onClick={addToken} disabled={!newToken.trim()}>
                       <Plus className="w-4 h-4" /> Agregar
                     </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => setBatchOpen(true)}
+                      disabled={items.length === 0 || recordingId != null}
+                      title="Grabar todos los tokens en una toma"
+                    >
+                      <Layers className="w-4 h-4" /> Grabar todos
+                    </Button>
                   </div>
 
                   {items.length === 0 ? (
@@ -535,6 +545,13 @@ export function StimuliPage() {
         <StimulusEditDialog
           stimulus={editStimulus}
           onClose={() => setEditStimulus(null)}
+          onSaved={() => refreshItems()}
+        />
+      )}
+      {batchOpen && selectedList && (
+        <BatchRecordDialog
+          items={items}
+          onClose={() => setBatchOpen(false)}
           onSaved={() => refreshItems()}
         />
       )}

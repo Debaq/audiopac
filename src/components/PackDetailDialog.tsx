@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { fetchPackManifest, installPack, uninstallPack } from '@/lib/packs/installer'
 import type { PackManifest, PacksIndexEntry, PackRequirements } from '@/lib/packs/types'
-import { Markdown } from '@/lib/markdown'
+import { Markdown, renderInline } from '@/lib/markdown'
 
 const REQ: Record<PackRequirements, { icon: typeof Mic; text: string; color: string }> = {
   ninguno: { icon: Music, text: 'Listo para usar', color: 'text-emerald-600' },
@@ -163,8 +163,10 @@ export function PackDetailDialog({
                   <ul className="space-y-1 text-xs list-disc pl-5">
                     {manifest.references.map((r, i) => (
                       <li key={i} className="text-[var(--muted-foreground)]">
-                        {r.citation}
-                        {r.url && <a href={r.url} target="_blank" rel="noreferrer" className="underline ml-1 text-[var(--primary)]">link</a>}
+                        {renderInline(r.citation)}
+                        {r.year && <span> ({r.year})</span>}
+                        {r.doi && <> · DOI: <a href={`https://doi.org/${r.doi}`} target="_blank" rel="noreferrer" className="underline text-[var(--primary)]">{r.doi}</a></>}
+                        {r.url && <> · <a href={r.url} target="_blank" rel="noreferrer" className="underline text-[var(--primary)]">link</a></>}
                       </li>
                     ))}
                   </ul>

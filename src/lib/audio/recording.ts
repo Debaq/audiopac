@@ -267,6 +267,134 @@ function findVadBounds(data: Float32Array, sampleRate: number, o: VadBoundsOpts)
   return [startSample, endSample]
 }
 
+export interface VadRangeMs { startMs: number; endMs: number }
+
+function resolveVadOpts(opts?: Partial<VadBoundsOpts>): VadBoundsOpts {
+  return {
+    noiseMarginDb: opts?.noiseMarginDb ?? DEFAULT_PROC.vadNoiseMarginDb,
+    preMarginMs: opts?.preMarginMs ?? DEFAULT_PROC.vadPreMarginMs,
+    postMarginMs: opts?.postMarginMs ?? DEFAULT_PROC.vadPostMarginMs,
+    minSilenceMs: opts?.minSilenceMs ?? DEFAULT_PROC.vadMinSilenceMs,
+    minSpeechMs: opts?.minSpeechMs ?? DEFAULT_PROC.vadMinSpeechMs,
+    absFloorDbfs: opts?.absFloorDbfs ?? DEFAULT_PROC.vadAbsFloorDbfs,
+    zcrAssist: opts?.zcrAssist ?? DEFAULT_PROC.vadZcrAssist,
+  }
+}
+
+/**
+ * VAD sobre AudioBuffer → rango único en ms. null si no detecta voz.
+ */
+export function detectVadBoundsMs(buf: AudioBuffer, opts?: Partial<VadBoundsOpts>): VadRangeMs | null {
+  const data = buf.getChannelData(0)
+  const b = findVadBounds(data, buf.sampleRate, resolveVadOpts(opts))
+  if (!b) return null
+  return {
+    startMs: Math.round((b[0] / buf.sampleRate) * 1000),
+    endMs: Math.round((b[1] / buf.sampleRate) * 1000),
+  }
+}
+
+/**
+ * Detecta múltiples segmentos de voz separados por pausas >= segmentGapMs.
+ * Útil para partir una grabación corrida de N tokens.
+ */
+export function detectVadSegmentsMs(
+  buf: AudioBuffer,
+  opts?: Partial<VadBoundsOpts> & { segmentGapMs?: number },
+): VadRangeMs[] {
+  const o = resolveVadOpts(opts)
+  const segGapMs = opts?.segmentGapMs ?? 350
+  const data = buf.getChannelData(0)
+  const sampleRate = buf.sampleRate
+
+  const winSamples = Math.max(1, Math.floor(sampleRate * 0.010))
+  const hopSamples = Math.max(1, Math.floor(sampleRate * 0.005))
+  const nFrames = Math.max(0, Math.floor((data.length - winSamples) / hopSamples) + 1)
+  if (nFrames < 4) return []
+
+  const rmsDb = new Float32Array(nFrames)
+  const zcr = new Float32Array(nFrames)
+  for (let f = 0; f < nFrames; f++) {
+    const off = f * hopSamples
+    let s = 0
+    let crossings = 0
+    let prev = data[off]
+    for (let k = 0; k < winSamples; k++) {
+      const v = data[off + k]
+      s += v * v
+      if ((prev >= 0 && v < 0) || (prev < 0 && v >= 0)) crossings++
+      prev = v
+    }
+    const rms = Math.sqrt(s / winSamples)
+    rmsDb[f] = rms > 0 ? 20 * Math.log10(rms) : -120
+    zcr[f] = crossings / winSamples
+  }
+
+  const sortedDb = Array.from(rmsDb).filter((v) => Number.isFinite(v)).sort((a, b) => a - b)
+  if (sortedDb.length === 0) return []
+  const noiseDb = sortedDb[Math.floor(sortedDb.length * 0.10)]
+  const primaryThrDb = Math.max(noiseDb + o.noiseMarginDb, o.absFloorDbfs)
+  const fricThrDb = primaryThrDb - 6
+  const sortedZcr = Array.from(zcr).slice().sort((a, b) => a - b)
+  const zcrHigh = sortedZcr[Math.floor(sortedZcr.length * 0.70)]
+
+  const voice = new Uint8Array(nFrames)
+  for (let f = 0; f < nFrames; f++) {
+    if (rmsDb[f] > primaryThrDb) voice[f] = 1
+    else if (o.zcrAssist && rmsDb[f] > fricThrDb && zcr[f] > zcrHigh) voice[f] = 1
+  }
+
+  const minSpeechFrames = Math.max(1, Math.round(o.minSpeechMs / 5))
+  {
+    let f = 0
+    while (f < nFrames) {
+      if (voice[f] === 1) {
+        let j = f
+        while (j < nFrames && voice[j] === 1) j++
+        if (j - f < minSpeechFrames) for (let k = f; k < j; k++) voice[k] = 0
+        f = j
+      } else f++
+    }
+  }
+
+  // Rellenar huecos cortos (< segmentGapMs) para no partir dentro de una palabra.
+  const fillFrames = Math.max(1, Math.round(segGapMs / 5))
+  {
+    let f = 0
+    while (f < nFrames) {
+      if (voice[f] === 0) {
+        let j = f
+        while (j < nFrames && voice[j] === 0) j++
+        const leftVoice = f > 0 && voice[f - 1] === 1
+        const rightVoice = j < nFrames && voice[j] === 1
+        if (leftVoice && rightVoice && j - f < fillFrames) for (let k = f; k < j; k++) voice[k] = 1
+        f = j
+      } else f++
+    }
+  }
+
+  const preSamples = Math.floor((o.preMarginMs / 1000) * sampleRate)
+  const postSamples = Math.floor((o.postMarginMs / 1000) * sampleRate)
+  const segs: VadRangeMs[] = []
+  let f = 0
+  while (f < nFrames) {
+    if (voice[f] === 1) {
+      const start = f
+      while (f < nFrames && voice[f] === 1) f++
+      const end = f
+      const startSample = Math.max(0, start * hopSamples - preSamples)
+      const endSample = Math.min(data.length, end * hopSamples + winSamples + postSamples)
+      if (endSample > startSample) {
+        segs.push({
+          startMs: Math.round((startSample / sampleRate) * 1000),
+          endMs: Math.round((endSample / sampleRate) * 1000),
+        })
+      }
+    } else f++
+  }
+  return segs
+}
+
 async function resampleMono(buf: AudioBuffer, targetRate: number): Promise<AudioBuffer> {
   if (buf.sampleRate === targetRate && buf.numberOfChannels === 1) return buf
   const length = Math.round(buf.duration * targetRate)

@@ -227,7 +227,7 @@ export class HINTController {
     if (this.state.isPlaying) return
     const stim = this.stimuli.find(s => s.id === trial.stimulus_id)
     if (!stim) return
-    if (this.preview || !stim.file_path) {
+    if (!stim.file_path) {
       this.state.isPlaying = true
       trial.presented_at = Date.now()
       this.emit()

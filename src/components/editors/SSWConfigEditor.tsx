@@ -20,6 +20,7 @@ export const BLANK_SSW: SSWParams = {
   ear_first_order: 'RLRL',
   show_pair_label: false,
   iri_ms: 2000,
+  catch_trials: null,
 }
 
 type Slot = 'RNC' | 'RC' | 'LC' | 'LNC'
@@ -131,6 +132,12 @@ export function SSWConfigEditor({ value, onChange, disabled, onGoToRecord }: Pro
   }).length
   const allReady = completeItems >= numItems
 
+  const DUR_MIN_MS = 450
+  const DUR_MAX_MS = 650
+  const isOutOfRange = (s: Stimulus | undefined) =>
+    !!(s?.file_path && typeof s.duration_ms === 'number' && (s.duration_ms < DUR_MIN_MS || s.duration_ms > DUR_MAX_MS))
+  const outOfRangeCount = items.filter(s => isOutOfRange(s)).length
+
   return (
     <Card className="mb-4">
       <CardHeader><CardTitle>Parámetros SSW</CardTitle></CardHeader>
@@ -228,6 +235,40 @@ export function SSWConfigEditor({ value, onChange, disabled, onGoToRecord }: Pro
               <Label htmlFor="show_pair_label" className="text-xs">Mostrar pair_label al paciente (sólo ensayo)</Label>
             </div>
 
+            <div className="border border-[var(--border)] rounded-md p-2.5 space-y-2">
+              <div className="flex items-center gap-2">
+                <input
+                  id="catch_enabled"
+                  type="checkbox"
+                  checked={!!value.catch_trials?.enabled}
+                  onChange={e => set('catch_trials', e.target.checked
+                    ? { enabled: true, every_n: value.catch_trials?.every_n ?? 10 }
+                    : null)}
+                  disabled={disabled}
+                />
+                <Label htmlFor="catch_enabled" className="text-xs font-semibold">Catch trials de atención</Label>
+              </div>
+              {value.catch_trials?.enabled && (
+                <div className="flex items-center gap-2 pl-5">
+                  <Label className="text-[11px]">Cada</Label>
+                  <Input
+                    type="number" min={2} max={40}
+                    value={value.catch_trials.every_n}
+                    onChange={e => set('catch_trials', {
+                      enabled: true,
+                      every_n: Math.max(2, Number(e.target.value) || 10),
+                    })}
+                    disabled={disabled}
+                    className="w-16 h-7 text-[11px]"
+                  />
+                  <Label className="text-[11px]">ítems se pregunta "¿qué oído fue primero?"</Label>
+                </div>
+              )}
+              <p className="text-[10px] text-[var(--muted-foreground)]">
+                Intercala una pregunta de atención sin audio extra: "¿qué oído escuchaste primero en el ítem anterior?". Valida lateralización y detecta pacientes distraídos. Precisión {'<'}80% marca el informe con <code>atencion_dudosa</code>.
+              </p>
+            </div>
+
             <div className="rounded-md bg-[var(--secondary)] p-2.5 text-[11px] text-[var(--muted-foreground)] space-y-1">
               <div><b>SSW</b> (Katz 1962/1998): 40 ítems × 4 hemispondees = 160 respuestas. Cada ítem presenta <code>RNC → (RC ∥ LC) → LNC</code> (R-first) o espejado (L-first).</div>
               <div>Requiere 160 grabaciones ordenadas. Auto-asignar asume secuencia RNC, RC, LC, LNC por ítem.</div>
@@ -251,6 +292,20 @@ export function SSWConfigEditor({ value, onChange, disabled, onGoToRecord }: Pro
                     {items.length} tokens · {recordedCount} grabados · {unassigned.length} sin slot
                   </div>
                 </div>
+
+                {outOfRangeCount > 0 && (
+                  <div className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/5 p-2 text-[11px]">
+                    <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
+                    <div>
+                      <div className="font-semibold text-amber-700">
+                        {outOfRangeCount} hemispondee{outOfRangeCount === 1 ? '' : 's'} con duración fuera de {DUR_MIN_MS}–{DUR_MAX_MS} ms
+                      </div>
+                      <div className="text-[var(--muted-foreground)]">
+                        Durations muy distintas entre RC/LC desalinean el solape dicótico y ensucian el scoring de condiciones competing. Recortá en <code>/estímulos</code> (editor por token) o regrabá.
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {editable && (
                   <div className="flex gap-2">
@@ -285,9 +340,13 @@ export function SSWConfigEditor({ value, onChange, disabled, onGoToRecord }: Pro
                               return (
                                 <td key={slot} className="px-1 py-0.5">
                                   {s ? (
-                                    <div className={`flex items-center gap-1 px-1 py-0.5 rounded border ${s.file_path ? 'border-emerald-500/30 bg-emerald-500/5' : 'border-amber-500/30 bg-amber-500/5'}`}>
+                                    <div
+                                      className={`flex items-center gap-1 px-1 py-0.5 rounded border ${isOutOfRange(s) ? 'border-amber-500/50 bg-amber-500/10' : s.file_path ? 'border-emerald-500/30 bg-emerald-500/5' : 'border-amber-500/30 bg-amber-500/5'}`}
+                                      title={isOutOfRange(s) ? `Duración ${Math.round(s.duration_ms!)} ms fuera de ${DUR_MIN_MS}–${DUR_MAX_MS} ms` : undefined}
+                                    >
                                       <span className="flex-1 truncate">{s.token || '—'}</span>
-                                      {s.file_path && <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" />}
+                                      {isOutOfRange(s) && <AlertTriangle className="w-3 h-3 text-amber-600 shrink-0" />}
+                                      {s.file_path && !isOutOfRange(s) && <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" />}
                                       {editable && (
                                         <button
                                           type="button"

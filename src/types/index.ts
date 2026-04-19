@@ -2,7 +2,7 @@ export type Ear = 'left' | 'right' | 'binaural'
 export type ResponseMode = 'verbal' | 'hummed' | 'manual'
 export type TestType = 'DPS' | 'PPS' | 'CUSTOM' | 'SSW'
 export type SessionStatus = 'in_progress' | 'completed' | 'cancelled'
-export type Phase = 'practice' | 'test'
+export type Phase = 'practice' | 'test' | 'catch'
 
 export interface Profile {
   id: number
@@ -346,6 +346,16 @@ export interface SSWParams {
   show_pair_label?: boolean
   /** ISI entre ítems, ms. */
   iri_ms?: number
+  /**
+   * Catch trials de atención. Cada `every_n` ítems se interrumpe con una
+   * pregunta "¿qué oído escuchaste primero?" sobre el trial recién respondido.
+   * No requiere audio extra — valida si el paciente está atento y puede
+   * discriminar lateralización.
+   */
+  catch_trials?: {
+    enabled: boolean
+    every_n: number
+  } | null
 }
 
 export interface SSWStimulusMeta {
@@ -375,6 +385,10 @@ export interface SSWScore {
   corrected_score_pct?: number
   response_bias: 'none' | 'left' | 'right'
   qualifiers: string[]
+  /** Catch trials de atención (si están habilitados). */
+  catch_correct?: number
+  catch_total?: number
+  catch_accuracy_pct?: number
 }
 
 export interface Calibration {

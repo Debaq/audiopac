@@ -67,10 +67,10 @@ function parseBlocks(md: string): Block[] {
   return out
 }
 
-function renderInline(text: string): ReactNode[] {
+export function renderInline(text: string): ReactNode[] {
   // Patrones: `code`, **bold**, *italic*, [txt](url)
   const nodes: ReactNode[] = []
-  const re = /(`[^`]+`)|(\*\*[^*]+\*\*)|(\*[^*]+\*)|(\[[^\]]+\]\([^)]+\))/g
+  const re = /(`[^`]+`)|(\*\*[^*]+\*\*)|(\*[^*]+\*)|(\[[^\]]+\]\([^)]+\))|(\bdoi:\s*)?(\b10\.\d{4,9}\/[^\s)\]]+)/gi
   let last = 0; let m: RegExpExecArray | null; let key = 0
   while ((m = re.exec(text)) !== null) {
     if (m.index > last) nodes.push(<Fragment key={key++}>{text.slice(last, m.index)}</Fragment>)
@@ -84,6 +84,14 @@ function renderInline(text: string): ReactNode[] {
     } else if (tok.startsWith('[')) {
       const mm = /^\[([^\]]+)\]\(([^)]+)\)$/.exec(tok)!
       nodes.push(<a key={key++} href={mm[2]} target="_blank" rel="noreferrer" className="underline text-[var(--primary)]">{mm[1]}</a>)
+    } else {
+      // DOI (con o sin prefijo "doi:")
+      const doi = m[6]
+      const trimmed = doi.replace(/[.,;]+$/, '')
+      const trailing = doi.slice(trimmed.length)
+      if (m[5]) nodes.push(<Fragment key={key++}>{m[5]}</Fragment>)
+      nodes.push(<a key={key++} href={`https://doi.org/${trimmed}`} target="_blank" rel="noreferrer" className="underline text-[var(--primary)]">{trimmed}</a>)
+      if (trailing) nodes.push(<Fragment key={key++}>{trailing}</Fragment>)
     }
     last = m.index + tok.length
   }

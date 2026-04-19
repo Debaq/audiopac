@@ -57,7 +57,6 @@ export class SRTController {
   private refDb?: number
   private bufferCache: BufferCache = new Map()
   private stopHandle: (() => void) | null = null
-  private preview: boolean
 
   private usedIdsGlobal = new Set<number>()
 
@@ -73,7 +72,6 @@ export class SRTController {
     preview = false,
   ) {
     this.params = params
-    this.preview = preview
     this.stimuli = preview ? stimuli : stimuli.filter(s => s.file_path)
     this.ear = ear
     this.refDb = refDb
@@ -214,7 +212,7 @@ export class SRTController {
     if (this.state.isPlaying) return
     const stim = this.stimuli.find(s => s.id === trial.stimulus_id)
     if (!stim) return
-    if (this.preview || !stim.file_path) {
+    if (!stim.file_path) {
       this.state.isPlaying = true
       trial.presented_at = Date.now()
       this.emit()

@@ -25,5 +25,11 @@ pub fn get_migrations() -> Vec<Migration> {
             sql: include_str!("../migrations/003_ssw.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 4,
+            description: "ssw_catch_phase",
+            sql: include_str!("../migrations/004_ssw_catch.sql"),
+            kind: MigrationKind::Up,
+        },
     ]
 }

@@ -16,7 +16,7 @@ import {
   fillReportTemplate,
   type TemplatePackInfo, type Verdict,
 } from '@/lib/packs/interpretation'
-import { Markdown } from '@/lib/markdown'
+import { Markdown, renderInline } from '@/lib/markdown'
 import { scoreFromResponses as sswScoreFromResponses } from '@/lib/audio/sswRunner'
 import type { SSWScore } from '@/types'
 import { save } from '@tauri-apps/plugin-dialog'
@@ -345,11 +345,12 @@ export function SessionReportPage() {
           verdict={verdictMeta.label}
           rtMean={analysis.test.rt.mean}
           rtMedian={analysis.test.rt.median}
-          sswScore={template.config.ssw ? sswScoreFromResponses(data.responses.filter(r => r.phase === 'test').map(r => ({
+          sswScore={template.config.ssw ? sswScoreFromResponses(data.responses.filter(r => r.phase === 'test' || r.phase === 'catch').map(r => ({
             item_index: r.item_index,
             expected_pattern: r.expected_pattern,
             given_pattern: r.given_pattern,
             is_correct: r.is_correct,
+            phase: r.phase,
           }))) : null}
         />
       )}
@@ -436,8 +437,10 @@ function PackNormsCard({
             <ul className="mt-1.5 space-y-1 pl-4 list-disc">
               {pack.references.map((r, i) => (
                 <li key={i} className="text-[var(--muted-foreground)]">
-                  {r.citation}
-                  {r.url && <a href={r.url} target="_blank" rel="noreferrer" className="underline ml-1">link</a>}
+                  {renderInline(r.citation)}
+                  {r.year && <span> ({r.year})</span>}
+                  {r.doi && <> · DOI: <a href={`https://doi.org/${r.doi}`} target="_blank" rel="noreferrer" className="underline">{r.doi}</a></>}
+                  {r.url && <> · <a href={r.url} target="_blank" rel="noreferrer" className="underline">link</a></>}
                 </li>
               ))}
             </ul>
@@ -503,6 +506,9 @@ function PackReportTemplateCard({
     ssw_order_effect: sswScore ? sswScore.order_effect_pct.toFixed(1) : null,
     ssw_reversals: sswScore ? sswScore.reversals : null,
     ssw_verdict: sswScore ? (sswScore.raw_score_pct <= 10 ? 'Normal' : sswScore.raw_score_pct <= 16 ? 'Limítrofe' : 'Bajo norma') : null,
+    ssw_catch_correct: sswScore?.catch_correct ?? null,
+    ssw_catch_total: sswScore?.catch_total ?? null,
+    ssw_catch_accuracy: sswScore?.catch_accuracy_pct !== undefined ? sswScore.catch_accuracy_pct.toFixed(0) : null,
   }
 
   const filled = fillReportTemplate(pack.report_template_md!, ctx)
@@ -518,14 +524,15 @@ function PackReportTemplateCard({
 }
 
 function SSWReportCard({ responses }: { responses: { item_index: number; expected_pattern: string; given_pattern: string | null; is_correct: number | null; phase: string }[] }) {
-  const testResponses = responses.filter(r => r.phase === 'test').map(r => ({
+  const relevant = responses.filter(r => r.phase === 'test' || r.phase === 'catch').map(r => ({
     item_index: r.item_index,
     expected_pattern: r.expected_pattern,
     given_pattern: r.given_pattern,
     is_correct: r.is_correct,
+    phase: r.phase,
   }))
-  if (testResponses.length === 0) return null
-  const score = sswScoreFromResponses(testResponses)
+  if (relevant.filter(r => r.phase === 'test').length === 0) return null
+  const score = sswScoreFromResponses(relevant)
   const conds: ('RNC' | 'RC' | 'LC' | 'LNC')[] = ['RNC', 'RC', 'LC', 'LNC']
   const verdict = score.raw_score_pct <= 10 ? { label: 'Normal', color: 'emerald' }
     : score.raw_score_pct <= 16 ? { label: 'Limítrofe', color: 'amber' }
@@ -575,6 +582,22 @@ function SSWReportCard({ responses }: { responses: { item_index: number; expecte
             <div className="text-xs">Bias: <b>{score.response_bias}</b></div>
           </div>
         </div>
+
+        {score.catch_total !== undefined && score.catch_total > 0 && (
+          <div className={cn(
+            'rounded-md border p-3 text-xs',
+            (score.catch_accuracy_pct ?? 0) < 80
+              ? 'border-amber-500/50 bg-amber-500/5'
+              : 'border-emerald-500/30 bg-emerald-500/5',
+          )}>
+            <div className="text-[var(--muted-foreground)] mb-1">Catch trials de atención</div>
+            <div>
+              <b>{score.catch_correct}/{score.catch_total}</b> correctos ·
+              <b> {(score.catch_accuracy_pct ?? 0).toFixed(0)}%</b>
+              {(score.catch_accuracy_pct ?? 0) < 80 && ' — precisión baja, interpretar con cautela'}
+            </div>
+          </div>
+        )}
 
         {score.qualifiers.length > 0 && (
           <div className="flex flex-wrap gap-1">

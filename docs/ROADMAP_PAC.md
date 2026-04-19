@@ -209,6 +209,8 @@ Objetivo: que los dB reportados sean dB SPL reales, no pseudo-calibrados.
 
 - ✅ 6.5 Bootstrap primer arranque: `<BootstrapDialog>` bloqueante tras schema ok si `settings.bootstrap_done != '1'`. Fetch `index.json`, checkboxes pre-marcados para `pac-patterns-v1`/`pac-limens-v1`/`pac-temporal-v1`, botón "Todos/Ninguno", "Omitir e instalar luego" (marca done sin instalar). Progreso por pack. Integrado en `App.tsx`.
 - ✅ 6.6 Ficha rica del pack (`<PackDetailDialog>`): modal con markdown render (`src/lib/markdown.tsx`, parser propio sin deps), lista de tests/listas incluidos con códigos y categorías, interpretación, referencias, autor. Botón "Detalle" en `<PacksSection>` abre el modal con install/uninstall integrados.
+- ✅ **Referencias enriquecidas**: `PackReference` extendido con `doi` y `year` (`src/lib/packs/types.ts`). `PackDetailDialog`, `TestDetailPanel` y `SessionReportPage` renderizan año entre paréntesis + DOI clicable (`https://doi.org/{doi}`) + link externo. `renderInline` exportado desde `markdown.tsx` y autolinkea DOIs sueltos en texto (patrón `10.xxxx/...` con o sin prefijo `doi:`).
+- ✅ **Secciones nuevas en ficha clínica por test**: `neural_basis_md` (ícono cerebro) y `scoring_md` (ícono calculadora) agregados a `PackTest`/`PackTestMeta` y renderizados en `<TestDetailPanel>`. Packs pueden documentar base neural del paradigma y cómo se computa el score sin colarlos en `how_it_works_md`.
 - ✅ 6.7 Interpretación dinámica en `SessionReportPage`: `getPackForTemplate(template_id)` via JOIN packs, `pickNormBand(age)`, `evaluateNorm(metric, value, band)` con direcciones correctas (higher-better para `accuracy_pct`/`asymmetry_pct`, lower-better para `srt_db`/`gap_ms`). Card "Normativa clínica" con banda matched, umbrales legibles, verdict badge, `description_md` y referencias colapsables. Auto-verdict solo cuando el valor es derivable de `test_score` (accuracy/asymmetry); otras métricas muestran tabla para interpretación manual.
 - ✅ 6.8 PPS_STD (Pinheiro 880/1430) y DPS_STD (Musiek, 60 secuencias) publicados como packs independientes `pps-pinheiro-v1` y `dps-musiek-v1` en el repo assets (alternativa más limpia que pac-patterns-v2 — cada test estándar histórico en su propio pack).
 - ✅ 6.9 Plantillas reporte custom por pack. Campo opcional `report_template_md` en `PackManifest` → almacenado dentro de `packs.metadata_json` (sin nueva migración). Placeholders soportados: `{{patient_name}}`, `{{patient_age}}`, `{{test_name}}`, `{{test_code}}`, `{{date}}`, `{{ear}}`, `{{examiner}}`, `{{accuracy_pct}}`, `{{correct}}`, `{{total}}`, `{{verdict}}`, `{{rt_mean_ms}}`, `{{rt_median_ms}}`, `{{asymmetry_pct}}`, `{{metric_value}}`, `{{norm_band}}`, `{{pack_name}}`, `{{pack_version}}`. `fillReportTemplate()` resuelve placeholders; faltantes → `—`. `<PackReportTemplateCard>` en `SessionReportPage` renderiza markdown narrativo. Ejemplo publicado en `pac-patterns-v1` v1.1.0.
@@ -310,6 +312,12 @@ Ficha muestra: descripción, licencia, referencias, cantidad de tests/listas, ta
 ## 7. SSW adaptado ES — plan completo de implementación ✅ hecho (v1.0.0-beta)
 
 **Estado (2026-04-19):** pack `ssw-es-v1` publicado en `audiopac-assets`. Motor `playSSWItem`, `SSWController` runner, `SSWConfigEditor`, `SSWRun`, `SSWReportCard` y placeholders `ssw_*` en `fillReportTemplate` integrados. Migración 003 agrega `category='ssw'` y `test_type='SSW'` al schema. Corpus beta (40 ítems × 4 hemispondees = 160 tokens) pseudo-compuestos bisílabos llanos — requiere validación clínica y grabación por usuario.
+
+**Mejoras hardening (2026-04-19):**
+- ✅ **Badge "Uso investigativo"** en `<TestDetailPanel>` (banner del test). Se dispara por `meta.investigative === true` en el pack o por fallback cuando el engine es `ssw`. Tooltip: "Adaptación no validada clínicamente en ES". Flag nuevo `investigative?: boolean` + `investigative_reason_md?` en `PackTest`/`PackTestMeta` → se persiste en `tests_meta` del pack (TEST_META_FIELDS en `installer.ts`). Cualquier pack puede marcarse investigativo sin tocar app.
+- ✅ **Warning de durations** en `SSWConfigEditor`: banner ámbar con conteo global de hemispondees fuera de 450–650 ms + ícono `AlertTriangle` por celda del grid con tooltip mostrando la duración real. Estilo ámbar en lugar de verde para celdas fuera de rango. Previene desalineación RC/LC del solape dicótico.
+- ✅ **Catch trials de atención**: nuevo campo `SSWParams.catch_trials = { enabled, every_n }`. Cada `every_n` ítems (default 10) el runner intercala una pregunta "¿qué oído escuchaste primero en el ítem anterior?" — sin audio extra, valida lateralización + atención. Controller: `pendingCatch` bloquea `next()` hasta que el usuario responde vía `answerCatch('R'|'L')`. Score extendido con `catch_correct/catch_total/catch_accuracy_pct`. Qualifier `atencion_dudosa` si <80%. UI `SSWRun`: card ámbar dedicada con shortcuts `R`/`L` + stats en vivo + bloque en resultado final. Editor SSW: acordeón con toggle + `every_n`.
+- ✅ **Persistencia catch** (migración 004): extiende `test_responses.phase` CHECK con `'catch'`. `Phase` type en TS suma `'catch'`. `SSWRun.handleCatchAnswer` llama `saveResponse({phase:'catch', expected_pattern: askedEar, given_pattern: answeredEar, is_correct})`. `SSWController.hydrate` reconstruye `catchResponses` al reanudar sesión. `scoreFromResponses` en runner y `<SSWReportCard>` contemplan catch rows — el informe ahora muestra precisión de catch con semáforo verde/ámbar según <80%. Placeholders de template `{{ssw_catch_correct}}`, `{{ssw_catch_total}}`, `{{ssw_catch_accuracy}}`.
 
 **SSW** (Staggered Spondaic Word Test — Katz 1962, rev. 1998) evalúa procesamiento auditivo central adulto/pediátrico con **pares spondee dicóticos parcialmente solapados**. Cuatro condiciones por ítem:
 
@@ -822,7 +830,9 @@ Es un refactor medio-grande: UI + schema pack + backfill de contenido clínico (
 - ✅ **Acceso a grabación integrado**: handler `goToRecord(listCode)` en `TestEditorPage` → guarda el test (crea o update) y navega a `/estimulos?list=CODE&returnTo=/tests/<id>`. `StimuliPage` lee `?list` (fuerza `ignoreCountry` para mostrar Sharvard ES u otros), `?returnTo` muestra botón **← Volver al editor**.
 - ✅ **Descarga pack audio**: `TestDetailPanel` detecta `pack.requirements === 'audio_pack'` y ofrece doble botón "Descargar del pack" (→ `/catalogos`) + "Grabar yo mismo" (→ `/estimulos`).
 - ✅ `<InlineListCreator>` (`src/components/editors/InlineListCreator.tsx`): modal genérico para crear `stimulus_list` desde el editor (nombre, país, seed tokens opcional). Reutilizado por SRT + Dichotic.
-- ✅ `<StimulusEditDialog>` (`src/components/StimulusEditDialog.tsx`): modal con waveform canvas + sliders inicio/fin + preview recortado → re-encode WAV + `updateStimulusRecording`. Accesible desde `/estimulos` por token.
+- ✅ `<StimulusEditDialog>` (`src/components/StimulusEditDialog.tsx`): modal con waveform canvas + sliders inicio/fin + preview recortado → re-encode WAV + `updateStimulusRecording`. Accesible desde `/estimulos` por token. **Auto-detect VAD** (botón "Auto"): llama `detectVadBoundsMs(buffer)` al abrir y como acción manual, fija cursores al rango de voz detectado (fallback al rango completo si no hay voz).
+- ✅ `<BatchRecordDialog>` (`src/components/BatchRecordDialog.tsx`): graba N tokens de una lista en **una sola toma continua**, auto-segmenta con `detectVadSegmentsMs` (pausas ≥350 ms separan ítems), waveform con overlays de segmentos (azul=actual / verde=conservar / rojo=descartar), edición de rangos por fila + toggle keep, guardado batch vía `saveStimulusWav` + `updateStimulusRecording`. Accesible desde `/estimulos` botón "Grabar todos".
+- ✅ Helpers VAD reutilizables en `src/lib/audio/recording.ts`: `detectVadBoundsMs(buf)` (rango único) y `detectVadSegmentsMs(buf, {segmentGapMs})` (múltiples segmentos separados por silencio). Misma lógica que `findVadBounds` (ventana 10/5 ms, piso ruido percentil 10, +12 dB, ZCR assist, cierre morfológico), expuesta como API pública.
 - ✅ `<TokenInfoDialog>` (`src/components/TokenInfoDialog.tsx`): modal al clickear un chip de token, muestra análisis fonético completo (ver §8.6.5).
 
 #### 8.6.2 Editor SRT ✅ hecho (v1 básico)
@@ -1019,3 +1029,31 @@ Prioridad (ruta C mixta ya definida en §8.6.6 — primero expandir schemas, esc
 - **Balance por contraste mínimo** (útil para PALPA): detectar si la lista tiene pares mínimos suficientes (sordo/sonoro, nasal/oral, etc.) para discriminación.
 - **Cross-engine**: aplicar `PhonemeBalanceChart` también en Dichotic (verificar monosilabicidad), HINT (frases → longitud media, balance por frase), Matrix (5-AFC vale para cada columna).
 - **Preview TTS opcional**: pronunciar un token dudoso vía Web Speech API `speechSynthesis` (ES-ES / ES-MX) para verificar acentuación sin grabar.
+
+---
+
+## 9. Vista previa de motores e informe ✅ hecho
+
+Modo preview sin paciente y sin persistencia (commit `1c4fe5d`):
+
+- Flag `preview` en los runners (`SRTController`, `HINTController`, `MatrixController`, `DichoticDigitsController`, `SSWController`): no filtra estímulos por `file_path`, permite recorrer toda la UI + informe sin grabaciones.
+- ✅ **Reproducción híbrida**: los runners ya no silencian todo en preview. Si el estímulo tiene audio real (`file_path`), se reproduce normalmente; si falta, se simula con `PREVIEW_PLAY_MS` de retardo silencioso. Aplica a SRT, HINT, Matrix, Dichotic Digits (por par, catch o normal) y SSW (por ítem: necesita las 4 piezas RNC/RC/LC/LNC presentes para audio real).
+- `<PreviewBanner>` actualizado reflejando el comportamiento híbrido.
+
+---
+
+## 10. Ficha clínica — base neural + cálculo de resultados ✅ hecho
+
+Cada test muestra ahora el **sustrato neurofisiológico** que respalda la prueba y el **algoritmo explícito** con el que se calcula el resultado. Antes la UI solo mostraba `purpose_md` / `how_it_works_md` / `protocol_md`, dejando implícitos el *por qué* fisiológico y el *cómo* matemático.
+
+- ✅ **Schema extendido** (`src/lib/packs/types.ts`): nuevos campos opcionales `neural_basis_md` y `scoring_md` en `PackTest` y `PackTestMeta`. Backwards compatible — packs antiguos siguen funcionando sin cambios.
+- ✅ **Installer** (`src/lib/packs/installer.ts`): `TEST_META_FIELDS` extendido para persistir los nuevos campos dentro de `packs.metadata_json.tests_meta[code]`. No requiere migración de DB.
+- ✅ **UI** (`src/components/TestDetailPanel.tsx`): dos secciones nuevas entre "Cómo funciona" y "Cómo se realiza":
+  - **Base neural** (icono `Brain`): estructuras y vías evaluadas (cóclea → tronco → corteza), con el principio fisiológico que justifica la prueba (modelo Kimura dicótico, banda crítica coclear, unmasking binaural en oliva superior medial, span de Miller, etc.).
+  - **Cómo se calcula el resultado** (icono `Calculator`): algoritmo paso a paso (bracketing Hughson-Westlake, step-down/up, promedios finales), métricas derivadas (REA, Ear Effect, Order Effect, SRT-SNR, MLD) y normas numéricas por edad.
+- ✅ **Contenido clínico poblado en 108 tests** de los 18 packs de `audiopac-assets`:
+  - 35 tests únicos: SSW, DD (free / directed), DPS, HINT, SRT (latam / us-es), Matrix, ILD, DICHOTIC_NV, FUSION_BIN, DLF / DLD / DLI (screen+fine), MLD, GIN, RGD 20/10/5, NBN, FPT, PPS (long/std), DPT, MEM_SEQ 5/6/7, GAP 20/10/5, TOJ (bin/fast), FGC, SINB.
+  - 70 listas HINT-Sharvard con texto compartido (mismas bases neurales que HINT, diferencia léxica).
+- ✅ **Index regenerado** (`assets/index.json`): sha256 y bytes recomputados para los 18 packs editados.
+
+Acción usuario: reinstalar / re-sync packs para que los nuevos campos aparezcan en la ficha clínica.

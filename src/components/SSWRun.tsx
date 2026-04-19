@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Play, StopCircle, AlertTriangle, RotateCcw } from 'lucide-react'
+import { Play, StopCircle, AlertTriangle, RotateCcw, Ear } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Textarea } from '@/components/ui/textarea'
@@ -73,6 +73,7 @@ export function SSWRun({ session, template, patient, params, preview = false }: 
           expected_pattern: r.expected_pattern,
           given_pattern: r.given_pattern,
           is_correct: r.is_correct,
+          phase: r.phase,
         })))
       }
       setState({ ...ctrl.state })
@@ -120,6 +121,30 @@ export function SSWRun({ session, template, patient, params, preview = false }: 
         reaction_time_ms: t.presented_at ? Date.now() - t.presented_at : null,
       })
     }
+    // Si hay catch trial pendiente, next() queda bloqueado hasta que el usuario responda.
+    if (!c.state.pendingCatch) {
+      c.next()
+      setInputs(emptyInputs())
+      setReversal(false)
+    }
+  }
+
+  const handleCatchAnswer = async (ear: 'R' | 'L') => {
+    const c = ctrlRef.current
+    if (!c || !c.state.pendingCatch) return
+    const pending = c.state.pendingCatch
+    const resp = c.answerCatch(ear)
+    if (resp && !preview) {
+      await saveResponse({
+        session_id: sid,
+        item_index: pending.after_index,
+        phase: 'catch',
+        expected_pattern: resp.asked_ear_first,
+        given_pattern: resp.answered,
+        is_correct: resp.correct,
+        reaction_time_ms: null,
+      })
+    }
     c.next()
     setInputs(emptyInputs())
     setReversal(false)
@@ -150,7 +175,7 @@ export function SSWRun({ session, template, patient, params, preview = false }: 
         test_score: 100 - score.raw_score_pct,
         total_items: score.total_items,
         correct_items: score.total_items - score.total_errors,
-        notes: `SSW: ${score.total_errors}/${score.total_items} errores (${score.raw_score_pct.toFixed(1)}%). Ear effect: ${score.ear_effect_pct.toFixed(1)}%. Reversals: ${score.reversals}. Ítems perfectos: ${correctItems}. ${notes}`,
+        notes: `SSW: ${score.total_errors}/${score.total_items} errores (${score.raw_score_pct.toFixed(1)}%). Ear effect: ${score.ear_effect_pct.toFixed(1)}%. Reversals: ${score.reversals}. Ítems perfectos: ${correctItems}.${score.catch_total ? ` Catch attention: ${score.catch_correct}/${score.catch_total} (${(score.catch_accuracy_pct ?? 0).toFixed(0)}%).` : ''} ${notes}`,
       })
       navigate(`/informes/${sid}`)
     } finally {
@@ -161,6 +186,13 @@ export function SSWRun({ session, template, patient, params, preview = false }: 
   // Atajo: Enter para submit si todos los slots tienen texto
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      const ctrl = ctrlRef.current
+      if (ctrl?.state.pendingCatch && !e.ctrlKey && !e.metaKey) {
+        const target = e.target as HTMLElement
+        if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return
+        if (e.key.toLowerCase() === 'r') { e.preventDefault(); handleCatchAnswer('R'); return }
+        if (e.key.toLowerCase() === 'l') { e.preventDefault(); handleCatchAnswer('L'); return }
+      }
       if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
         const target = e.target as HTMLElement
         if (target.tagName === 'TEXTAREA') return
@@ -225,7 +257,33 @@ export function SSWRun({ session, template, patient, params, preview = false }: 
           <StatTile label="Pair" value={trial.pair_label ?? `#${trial.item_id}`} />
         </div>
 
-        {!state.finished && (
+        {!state.finished && state.pendingCatch && (
+          <Card className="mb-6 border-2 border-amber-500/40 bg-amber-500/5">
+            <div className="h-1 bg-amber-500" />
+            <CardContent className="p-6 space-y-4 text-center">
+              <div className="text-xs uppercase tracking-widest text-amber-700 dark:text-amber-300">Chequeo de atención</div>
+              <h2 className="text-2xl font-bold">¿En qué oído escuchaste primero el ítem anterior?</h2>
+              <p className="text-xs text-[var(--muted-foreground)]">
+                Catch trial · no afecta el scoring SSW, sólo valida atención. Atajos: <b>R</b> derecho · <b>L</b> izquierdo.
+              </p>
+              <div className="flex gap-4 justify-center">
+                <Button size="xl" variant="outline" onClick={() => handleCatchAnswer('L')} className="min-w-[160px]">
+                  <Ear className="w-5 h-5" /> Izquierdo (L)
+                </Button>
+                <Button size="xl" variant="outline" onClick={() => handleCatchAnswer('R')} className="min-w-[160px]">
+                  <Ear className="w-5 h-5" /> Derecho (R)
+                </Button>
+              </div>
+              {state.catchResponses.length > 0 && (
+                <div className="text-[11px] text-[var(--muted-foreground)]">
+                  Hasta ahora: {state.catchResponses.filter(c => c.correct).length}/{state.catchResponses.length} correctos
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {!state.finished && !state.pendingCatch && (
           <Card className="mb-6 border-2 border-[var(--primary)]/20">
             <div className="h-1 bg-[var(--primary)]" />
             <CardContent className="p-6 space-y-4">
@@ -346,6 +404,19 @@ export function SSWRun({ session, template, patient, params, preview = false }: 
                 <div className="rounded border p-2">Order effect: <b>{state.score.order_effect_pct.toFixed(1)}%</b></div>
                 <div className="rounded border p-2">Reversals: <b>{state.score.reversals}</b></div>
               </div>
+              {state.score.catch_total !== undefined && state.score.catch_total > 0 && (
+                <div className={cn(
+                  'rounded border p-2 text-xs',
+                  (state.score.catch_accuracy_pct ?? 0) < 80
+                    ? 'border-amber-500/50 bg-amber-500/5'
+                    : 'border-emerald-500/30 bg-emerald-500/5',
+                )}>
+                  Catch trials de atención: <b>{state.score.catch_correct}/{state.score.catch_total}</b>
+                  {' · '}
+                  <b>{(state.score.catch_accuracy_pct ?? 0).toFixed(0)}%</b>
+                  {(state.score.catch_accuracy_pct ?? 0) < 80 && ' — precisión baja, interpretar con cautela'}
+                </div>
+              )}
               {state.score.qualifiers.length > 0 && (
                 <div className="flex flex-wrap gap-1">
                   {state.score.qualifiers.map(q => <Badge key={q} variant="outline">{q}</Badge>)}

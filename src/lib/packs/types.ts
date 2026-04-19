@@ -50,6 +50,8 @@ export interface PackTest {
   /** Markdown clínico para la ficha rica del test. Todos opcionales. */
   purpose_md?: string
   how_it_works_md?: string
+  neural_basis_md?: string
+  scoring_md?: string
   protocol_md?: string
   target_population_md?: string
   contraindications_md?: string
@@ -58,6 +60,10 @@ export interface PackTest {
   max_age_years?: number
   references?: PackTestReference[]
   attachments?: PackTestAttachment[]
+  /** Marca el test como investigativo / no diagnóstico certificado. */
+  investigative?: boolean
+  /** Razón (markdown) del flag investigativo. Se muestra al hover del badge. */
+  investigative_reason_md?: string
 }
 
 /** Meta por test, guardada dentro de `packs.metadata_json.tests_meta[code]`. */
@@ -65,6 +71,8 @@ export interface PackTestMeta {
   family?: string
   purpose_md?: string
   how_it_works_md?: string
+  neural_basis_md?: string
+  scoring_md?: string
   protocol_md?: string
   target_population_md?: string
   contraindications_md?: string
@@ -73,6 +81,8 @@ export interface PackTestMeta {
   max_age_years?: number
   references?: PackTestReference[]
   attachments?: PackTestAttachment[]
+  investigative?: boolean
+  investigative_reason_md?: string
 }
 
 export interface PackStimulusItem {
@@ -117,6 +127,8 @@ export interface PackAuthor {
 export interface PackReference {
   citation: string
   url?: string | null
+  doi?: string | null
+  year?: number | null
 }
 
 export interface PackManifest {

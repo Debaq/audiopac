@@ -68,7 +68,6 @@ export class MatrixController {
   private refDb?: number
   private bufferCache = new Map<number, AudioBuffer>()
   private stopHandle: (() => void) | null = null
-  private preview: boolean
 
   state: MatrixState
   private listeners = new Set<(s: MatrixState) => void>()
@@ -82,7 +81,6 @@ export class MatrixController {
     preview = false,
   ) {
     this.params = params
-    this.preview = preview
     this.columns = groupByColumn(stimuli, params.columns, preview)
     this.ear = ear
     this.refDb = refDb
@@ -219,7 +217,7 @@ export class MatrixController {
       if (!s) return
       stims.push(s)
     }
-    if (this.preview || stims.some(s => !s.file_path)) {
+    if (stims.some(s => !s.file_path)) {
       this.state.isPlaying = true
       trial.presented_at = Date.now()
       this.emit()

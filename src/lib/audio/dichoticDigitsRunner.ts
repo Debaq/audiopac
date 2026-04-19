@@ -56,7 +56,6 @@ export class DichoticDigitsController {
   private refDb?: number
   private bufferCache: Map<number, AudioBuffer> = new Map()
   private stopHandle: (() => void) | null = null
-  private preview: boolean
 
   state: DichoticState
   private listeners = new Set<(s: DichoticState) => void>()
@@ -69,7 +68,6 @@ export class DichoticDigitsController {
     preview = false,
   ) {
     this.params = params
-    this.preview = preview
     this.stimuli = preview ? stimuli : stimuli.filter(s => s.file_path)
     this.refDb = refDb
     this.curve = curve
@@ -250,7 +248,14 @@ export class DichoticDigitsController {
     pair.presented_at = Date.now()
     this.emit()
 
-    if (this.preview) {
+    const allIds = pair.is_catch
+      ? (pair.catch_ear === 'left' ? pair.left_ids : pair.right_ids)
+      : [...pair.left_ids, ...pair.right_ids]
+    const missingAudio = allIds.some(id => {
+      const s = this.stimuli.find(x => x.id === id)
+      return !s?.file_path
+    })
+    if (missingAudio) {
       await new Promise(r => setTimeout(r, PREVIEW_PLAY_MS))
       this.state.isPlaying = false
       this.emit()

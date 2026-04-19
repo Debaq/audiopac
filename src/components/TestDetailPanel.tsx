@@ -3,11 +3,12 @@ import { Link } from 'react-router-dom'
 import {
   Play, Package, Edit2, Trash2, BookOpen, Target, Stethoscope,
   Users, AlertTriangle, Clock, ExternalLink, FileText, Video, Link as LinkIcon,
-  Mic, Download, Eye,
+  Brain, Calculator,
+  Mic, Download, Eye, FlaskConical,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Markdown } from '@/lib/markdown'
+import { Markdown, renderInline } from '@/lib/markdown'
 import { getTemplateRichMeta, type TemplateRichMeta } from '@/lib/packs/interpretation'
 import { getListReadiness, readinessFromConfig, type ListReadiness } from '@/lib/packs/readiness'
 import { fetchPacksIndex } from '@/lib/packs/installer'
@@ -103,6 +104,20 @@ export function TestDetailPanel({
               ) : (
                 <Badge variant="outline">Personalizado</Badge>
               )}
+              {(() => {
+                const engine = detectEngine(template.config)
+                const flag = meta?.investigative ?? (engine === 'ssw')
+                if (!flag) return null
+                return (
+                  <Badge
+                    variant="outline"
+                    className="border-amber-500/50 bg-amber-500/10 text-amber-700 dark:text-amber-300"
+                    title="Uso investigativo — adaptación no validada clínicamente en ES. No reemplaza diagnóstico certificado."
+                  >
+                    <FlaskConical className="w-3 h-3 inline mr-1" /> Uso investigativo
+                  </Badge>
+                )
+              })()}
             </div>
             <div className="mt-1 text-xs text-[var(--muted-foreground)] font-mono">{template.code}</div>
             {template.description && (
@@ -252,6 +267,16 @@ export function TestDetailPanel({
               <Markdown source={meta.how_it_works_md} />
             </Section>
           )}
+          {meta.neural_basis_md && (
+            <Section icon={Brain} title="Base neural">
+              <Markdown source={meta.neural_basis_md} />
+            </Section>
+          )}
+          {meta.scoring_md && (
+            <Section icon={Calculator} title="Cómo se calcula el resultado">
+              <Markdown source={meta.scoring_md} />
+            </Section>
+          )}
           {meta.protocol_md && (
             <Section icon={Stethoscope} title="Cómo se realiza">
               <Markdown source={meta.protocol_md} />
@@ -272,9 +297,11 @@ export function TestDetailPanel({
               <ul className="list-disc pl-5 space-y-1">
                 {meta.references.map((r, i) => (
                   <li key={i}>
-                    {r.citation}
+                    {renderInline(r.citation)}
                     {r.year && <span className="text-[var(--muted-foreground)]"> ({r.year})</span>}
-                    {r.doi && <span className="text-[var(--muted-foreground)]"> · DOI: {r.doi}</span>}
+                    {r.doi && (
+                      <span className="text-[var(--muted-foreground)]"> · DOI: <a href={`https://doi.org/${r.doi}`} target="_blank" rel="noreferrer" className="text-[var(--primary)] underline">{r.doi}</a></span>
+                    )}
                     {r.url && (
                       <> · <a href={r.url} target="_blank" rel="noreferrer" className="text-[var(--primary)] underline">link</a></>
                     )}

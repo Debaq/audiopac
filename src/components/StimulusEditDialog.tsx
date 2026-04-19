@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { X, Play, Square, Scissors, RotateCcw } from 'lucide-react'
+import { X, Play, Square, Scissors, RotateCcw, Wand2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { playStimulusBuffer } from '@/lib/audio/engine'
-import { encodeWav, measureBuffer } from '@/lib/audio/recording'
+import { encodeWav, measureBuffer, detectVadBoundsMs } from '@/lib/audio/recording'
 import { loadStimulusWav, saveStimulusWav, removeStimulusFile } from '@/lib/fs/stimuli'
 import { updateStimulusRecording } from '@/lib/db/stimuli'
 import type { Stimulus } from '@/types'
@@ -85,9 +85,11 @@ export function StimulusEditDialog({ stimulus, onClose, onSaved }: Props) {
       const buf = await ctx.decodeAudioData(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer)
       await ctx.close()
       if (!alive) return
+      const total = Math.round(buf.duration * 1000)
       setBuffer(buf)
-      setStartMs(0)
-      setEndMs(Math.round(buf.duration * 1000))
+      const auto = detectVadBoundsMs(buf)
+      setStartMs(auto ? Math.max(0, auto.startMs) : 0)
+      setEndMs(auto ? Math.min(total, auto.endMs) : total)
     })()
     return () => { alive = false; stopRef.current?.() }
   }, [stimulus.id, stimulus.file_path])
@@ -119,6 +121,14 @@ export function StimulusEditDialog({ stimulus, onClose, onSaved }: Props) {
   const reset = () => {
     setStartMs(0)
     setEndMs(totalMs)
+  }
+
+  const autoDetect = () => {
+    if (!buffer) return
+    const r = detectVadBoundsMs(buffer)
+    if (!r) { alert('No se detectó voz. Ajustá los cursores manualmente.'); return }
+    setStartMs(Math.max(0, r.startMs))
+    setEndMs(Math.min(totalMs, r.endMs))
   }
 
   const applyTrim = async () => {
@@ -208,6 +218,9 @@ export function StimulusEditDialog({ stimulus, onClose, onSaved }: Props) {
             </div>
 
             <div className="flex gap-2 justify-end pt-2">
+              <Button variant="ghost" size="sm" onClick={autoDetect} disabled={saving} title="Detectar voz automáticamente">
+                <Wand2 className="w-4 h-4" /> Auto
+              </Button>
               <Button variant="ghost" size="sm" onClick={reset} disabled={saving}>
                 <RotateCcw className="w-4 h-4" /> Reset
               </Button>
