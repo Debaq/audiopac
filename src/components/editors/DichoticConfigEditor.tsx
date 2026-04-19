@@ -10,6 +10,7 @@ import type { DichoticBlockOrder, DichoticCatchTrials, DichoticCatchPlacement, D
 import { getListReadiness, type ListReadiness } from '@/lib/packs/readiness'
 import { listStimulusLists, listStimuli, getStimulusListByCode } from '@/lib/db/stimuli'
 import { InlineListCreator } from './InlineListCreator'
+import { PhonemeBalanceChart } from '@/components/PhonemeBalanceChart'
 import type { DichoticDigitsParams, DichoticPairDef, Stimulus, StimulusList } from '@/types'
 
 const DICHOTIC_DIGIT_SEED = ['uno', 'dos', 'tres', 'cuatro', 'cinco', 'seis', 'ocho', 'nueve']
@@ -162,6 +163,10 @@ export function DichoticConfigEditor({ value, onChange, disabled, onGoToRecord }
             </p>
           )}
         </div>
+
+        {tokens.length > 0 && (
+          <PhonemeBalanceChart tokens={tokens} expectMonosyllabic />
+        )}
 
         {showCreate && (
           <InlineListCreator

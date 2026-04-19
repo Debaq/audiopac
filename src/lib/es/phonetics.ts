@@ -343,6 +343,103 @@ export interface ArticulatoryStats {
   total_consonants: number
 }
 
+/**
+ * Score de balance vs distribución esperada usando chi-cuadrado normalizado.
+ * Entrada: observed counts (no %) y expected % (suma ≈ 100).
+ * Salida: 0–100 (100 = calce perfecto). Penaliza más las desviaciones relativas que Σ|diff|.
+ * No es un test estadístico válido (los tokens no son independientes), pero ordena bien
+ * para UX: celdas con expected bajo y muchos observados pesan más.
+ */
+export function chiSquareScore(observed: Record<string, number>, expectedPct: Record<string, number>, totalObs: number): number {
+  if (totalObs <= 0) return 0
+  let chi2 = 0
+  let dfRef = 0
+  for (const [k, expPct] of Object.entries(expectedPct)) {
+    const eCount = (expPct / 100) * totalObs
+    if (eCount < 0.5) continue  // evita división por ~0
+    const o = observed[k] ?? 0
+    chi2 += Math.pow(o - eCount, 2) / eCount
+    dfRef++
+  }
+  // normaliza por gl para que distintos vocabularios sean comparables
+  const df = Math.max(1, dfRef - 1)
+  const normalized = chi2 / df
+  // mapea a 0-100 con exp decay: score=100 si chi2/df=0, ~50 si chi2/df≈1, ~10 si ≈3
+  const score = 100 * Math.exp(-normalized)
+  return Math.max(0, Math.min(100, score))
+}
+
+// ============================================================================
+// Pares mínimos (ES) — útil para listas de discriminación tipo PALPA
+// ============================================================================
+
+export type MinimalPairContrast =
+  | 'voicing'            // p/b, t/d, k/g, s/z
+  | 'manner'             // cambio de modo (ej. p/f, t/s)
+  | 'place'              // cambio de punto (ej. p/t, m/n)
+  | 'nasal_oral'         // m/b, n/d
+  | 'vowel'              // cambio de vocal
+  | 'rhotic'             // r/rr
+  | 'other'
+
+export interface MinimalPair {
+  a: string
+  b: string
+  contrast: MinimalPairContrast
+  position: number       // índice de la letra que difiere (aprox)
+}
+
+/** Detecta pares mínimos por edit-distance 1 (misma longitud, una posición distinta). */
+export function findMinimalPairs(tokens: string[]): MinimalPair[] {
+  const pairs: MinimalPair[] = []
+  const norm = tokens.map(t => t.trim().toLowerCase()).filter(Boolean)
+  for (let i = 0; i < norm.length; i++) {
+    for (let j = i + 1; j < norm.length; j++) {
+      const a = norm[i], b = norm[j]
+      if (a.length !== b.length) continue
+      let diffs = 0
+      let pos = -1
+      for (let k = 0; k < a.length; k++) {
+        if (a[k] !== b[k]) { diffs++; pos = k; if (diffs > 1) break }
+      }
+      if (diffs !== 1) continue
+      const ca = a[pos], cb = b[pos]
+      pairs.push({ a, b, contrast: classifyContrast(ca, cb, a, b, pos), position: pos })
+    }
+  }
+  return pairs
+}
+
+function classifyContrast(ca: string, cb: string, a: string, b: string, pos: number): MinimalPairContrast {
+  if (isVowel(ca) && isVowel(cb)) return 'vowel'
+  // para c/g necesitamos contexto (vocal siguiente)
+  const fa = classifyConsonant(ca, a[pos + 1])
+  const fb = classifyConsonant(cb, b[pos + 1])
+  if (!fa || !fb) return 'other'
+  // r/rr — heurística: si uno de los dos son vibrantes distintas
+  if ((fa.manner === 'vibrante_simple' && fb.manner === 'vibrante_multiple') ||
+      (fa.manner === 'vibrante_multiple' && fb.manner === 'vibrante_simple')) return 'rhotic'
+  // nasal vs oral (no-nasal)
+  if ((fa.manner === 'nasal') !== (fb.manner === 'nasal')) return 'nasal_oral'
+  // voicing puro: mismo manner + mismo place + distinto voiced
+  if (fa.manner === fb.manner && fa.place === fb.place && fa.voiced !== fb.voiced) return 'voicing'
+  // manner distinto
+  if (fa.manner !== fb.manner) return 'manner'
+  // place distinto (mismo manner)
+  if (fa.place !== fb.place) return 'place'
+  return 'other'
+}
+
+export const CONTRAST_LABELS: Record<MinimalPairContrast, string> = {
+  voicing: 'sordo/sonoro',
+  manner: 'modo articulatorio',
+  place: 'punto articulatorio',
+  nasal_oral: 'nasal/oral',
+  vowel: 'vocal',
+  rhotic: 'r/rr',
+  other: 'otro',
+}
+
 export function articulatoryStats(tokens: string[]): ArticulatoryStats {
   const manner: Record<Manner, number> = {
     oclusiva: 0, fricativa: 0, africada: 0, nasal: 0, lateral: 0,

@@ -1,6 +1,8 @@
-import { X, CheckCircle2, AlertTriangle, Volume2 } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { X, CheckCircle2, AlertTriangle, Volume2, Mic2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Select } from '@/components/ui/select'
 import { analyze } from '@/lib/es/phonetics'
 import type { Stimulus } from '@/types'
 
@@ -11,8 +13,52 @@ interface Props {
   onPlay?: () => void
 }
 
+const TTS_LOCALE_KEY = 'audiopac.tts.locale'
+
+function listEsVoices(): SpeechSynthesisVoice[] {
+  if (typeof window === 'undefined' || !('speechSynthesis' in window)) return []
+  return window.speechSynthesis.getVoices().filter(v => v.lang?.toLowerCase().startsWith('es'))
+}
+
 export function TokenInfoDialog({ stimulus, onClose, onEditAudio, onPlay }: Props) {
   const a = analyze(stimulus.token)
+  const ttsSupported = typeof window !== 'undefined' && 'speechSynthesis' in window
+  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([])
+  const [locale, setLocale] = useState<string>(() => {
+    if (typeof window === 'undefined') return 'es-ES'
+    return localStorage.getItem(TTS_LOCALE_KEY) ?? 'es-ES'
+  })
+
+  useEffect(() => {
+    if (!ttsSupported) return
+    const update = () => setVoices(listEsVoices())
+    update()
+    window.speechSynthesis.addEventListener('voiceschanged', update)
+    return () => window.speechSynthesis.removeEventListener('voiceschanged', update)
+  }, [ttsSupported])
+
+  const availableLocales = useMemo(() => {
+    const set = new Set(voices.map(v => v.lang))
+    // siempre ofrecemos defaults
+    set.add('es-ES'); set.add('es-MX'); set.add('es-US'); set.add('es-AR')
+    return Array.from(set).sort()
+  }, [voices])
+
+  const speak = () => {
+    if (!ttsSupported) return
+    window.speechSynthesis.cancel()
+    const u = new SpeechSynthesisUtterance(stimulus.token)
+    u.lang = locale
+    const match = voices.find(v => v.lang === locale) ?? voices.find(v => v.lang.startsWith(locale.slice(0, 2)))
+    if (match) u.voice = match
+    u.rate = 0.9
+    window.speechSynthesis.speak(u)
+  }
+
+  const saveLocale = (v: string) => {
+    setLocale(v)
+    if (typeof window !== 'undefined') localStorage.setItem(TTS_LOCALE_KEY, v)
+  }
 
   return (
     <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={onClose}>
@@ -98,6 +144,23 @@ export function TokenInfoDialog({ stimulus, onClose, onEditAudio, onPlay }: Prop
             Regla ES: aguda = tónica en última; llana/grave = penúltima; esdrújula = antepenúltima; sobresdrújula = anterior.
             Digrafos <code>ch/ll/rr/qu</code> cuentan como una consonante. Sílabas calculadas con reglas de diptongo/hiato (algunos casos borde tipo "idea" pueden fallar).
           </div>
+
+          {ttsSupported && (
+            <div className="border border-[var(--border)]/50 rounded p-2 text-xs flex items-center gap-2 flex-wrap">
+              <span className="font-medium flex items-center gap-1"><Mic2 className="w-3.5 h-3.5" /> Pronunciación TTS</span>
+              <Select value={locale} onChange={e => saveLocale(e.target.value)} className="text-xs py-1 w-auto">
+                {availableLocales.map(l => (
+                  <option key={l} value={l}>{l}</option>
+                ))}
+              </Select>
+              <Button size="sm" variant="outline" onClick={speak}>
+                <Volume2 className="w-3.5 h-3.5" /> Pronunciar
+              </Button>
+              <span className="text-[10px] text-[var(--muted-foreground)]">
+                Preview sintético (no es el estímulo grabado). Útil para verificar acento/sílabas.
+              </span>
+            </div>
+          )}
 
           <div className="flex gap-2 justify-end pt-1">
             {onPlay && stimulus.file_path && (

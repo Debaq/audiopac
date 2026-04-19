@@ -4,8 +4,11 @@
  * No pretende ser IPA — trabaja a nivel ortográfico + digrafos.
  */
 
-import { analyze, articulatoryStats, MANNER_LABELS, PLACE_LABELS } from '@/lib/es/phonetics'
-import type { Manner, Place } from '@/lib/es/phonetics'
+import { useMemo, useState } from 'react'
+import { ChevronDown, ChevronRight, Info } from 'lucide-react'
+import { analyze, articulatoryStats, MANNER_LABELS, PLACE_LABELS, chiSquareScore, findMinimalPairs, CONTRAST_LABELS } from '@/lib/es/phonetics'
+import type { Manner, Place, MinimalPairContrast } from '@/lib/es/phonetics'
+import { generateSuggestions } from '@/lib/es/suggestions'
 
 // % esperado en corpus español (promedio texto/habla). Digrafos separados.
 const EXPECTED_CONS_PCT: Record<string, number> = {
@@ -54,20 +57,40 @@ function stripAccent(v: string): string {
   return v.normalize('NFD').replace(/\p{Diacritic}/gu, '')
 }
 
+/** Divide frases en palabras para análisis agregado. Descarta puntuación. */
+function tokensToWords(tokens: string[], mode: 'word' | 'sentence'): string[] {
+  if (mode === 'word') return tokens
+  const out: string[] = []
+  for (const t of tokens) {
+    for (const w of t.split(/\s+/)) {
+      const clean = w.replace(/[^\p{L}\-]/gu, '').toLowerCase()
+      if (clean) out.push(clean)
+    }
+  }
+  return out
+}
+
 interface Props {
   tokens: string[]
   className?: string
+  /** `sentence`: divide en palabras antes de analizar (HINT/Matrix). Default `word`. */
+  mode?: 'word' | 'sentence'
+  /** Si true, verifica que todos los tokens sean monosílabos (ej. Dichotic Digits). */
+  expectMonosyllabic?: boolean
+  /** Si true, muestra sección de pares mínimos (PALPA). */
+  showMinimalPairs?: boolean
 }
 
-export function PhonemeBalanceChart({ tokens, className }: Props) {
-  if (tokens.length === 0) return null
+export function PhonemeBalanceChart({ tokens, className, mode = 'word', expectMonosyllabic, showMinimalPairs }: Props) {
+  const words = useMemo(() => tokensToWords(tokens, mode), [tokens, mode])
+  if (words.length === 0) return null
 
   // Tally observado
   const consCount: Record<string, number> = {}
   const vowCount: Record<string, number> = {}
   let consTotal = 0
   let vowTotal = 0
-  for (const t of tokens) {
+  for (const t of words) {
     const a = analyze(t)
     for (const c of a.consonants) {
       consCount[c] = (consCount[c] ?? 0) + 1
@@ -87,12 +110,9 @@ export function PhonemeBalanceChart({ tokens, className }: Props) {
   const vowObsPct: Record<string, number> = {}
   for (const [k, v] of Object.entries(vowCount)) vowObsPct[k] = vowTotal > 0 ? (v / vowTotal) * 100 : 0
 
-  // Score global: suma de desviaciones absolutas respecto a esperado (menor = mejor balance)
-  let devCons = 0
-  const consKeys = new Set([...Object.keys(EXPECTED_CONS), ...Object.keys(consObsPct)])
-  for (const k of consKeys) devCons += Math.abs((consObsPct[k] ?? 0) - (EXPECTED_CONS[k] ?? 0))
-  let devVow = 0
-  for (const k of Object.keys(EXPECTED_VOW)) devVow += Math.abs((vowObsPct[k] ?? 0) - (EXPECTED_VOW[k] ?? 0))
+  // Score chi-cuadrado normalizado (reemplaza 100 − Σ|diff|)
+  const balanceScoreCons = chiSquareScore(consCount, EXPECTED_CONS, consTotal)
+  const balanceScoreVow = chiSquareScore(vowCount, EXPECTED_VOW, vowTotal)
 
   // Para mostrar: top 14 consonantes por esperado + vocales 5
   const consRows = Object.entries(EXPECTED_CONS)
@@ -154,13 +174,10 @@ export function PhonemeBalanceChart({ tokens, className }: Props) {
   const maxCons = Math.max(12, ...consRows.map(r => Math.max(r.observed, r.expected)))
   const maxVow = Math.max(20, ...vowRows.map(r => Math.max(r.observed, r.expected)))
 
-  const balanceScoreCons = Math.max(0, 100 - devCons)
-  const balanceScoreVow = Math.max(0, 100 - devVow)
-
   const balanceLabel = (score: number) =>
-    score >= 85 ? { txt: 'balanceado', color: 'bg-emerald-500/15 text-emerald-700' }
-    : score >= 70 ? { txt: 'aceptable', color: 'bg-sky-500/15 text-sky-700' }
-    : score >= 50 ? { txt: 'desbalanceado', color: 'bg-amber-500/15 text-amber-700' }
+    score >= 70 ? { txt: 'balanceado', color: 'bg-emerald-500/15 text-emerald-700' }
+    : score >= 45 ? { txt: 'aceptable', color: 'bg-sky-500/15 text-sky-700' }
+    : score >= 20 ? { txt: 'desbalanceado', color: 'bg-amber-500/15 text-amber-700' }
     : { txt: 'muy desbalanceado', color: 'bg-red-500/15 text-red-700' }
 
   const consLabel = balanceLabel(balanceScoreCons)
@@ -168,17 +185,22 @@ export function PhonemeBalanceChart({ tokens, className }: Props) {
 
   return (
     <div className={`rounded-md border border-[var(--border)]/40 bg-[var(--secondary)]/20 p-2.5 space-y-3 ${className ?? ''}`}>
-      <div className="flex items-center justify-between">
-        <b className="text-[11px]">Balance fonémico vs español</b>
+      <div className="flex items-center justify-between flex-wrap gap-1">
+        <b className="text-[11px]">
+          Balance fonémico vs español
+          {mode === 'sentence' && <span className="ml-1 text-[9px] font-normal text-[var(--muted-foreground)]">({words.length} palabras de {tokens.length} frases)</span>}
+        </b>
         <div className="flex gap-1.5 text-[10px]">
-          <span className={`px-1.5 py-0.5 rounded ${consLabel.color}`}>
+          <span className={`px-1.5 py-0.5 rounded ${consLabel.color}`} title="Chi-cuadrado normalizado (0-100)">
             Consonantes: {consLabel.txt} ({balanceScoreCons.toFixed(0)})
           </span>
-          <span className={`px-1.5 py-0.5 rounded ${vowLabel.color}`}>
+          <span className={`px-1.5 py-0.5 rounded ${vowLabel.color}`} title="Chi-cuadrado normalizado (0-100)">
             Vocales: {vowLabel.txt} ({balanceScoreVow.toFixed(0)})
           </span>
         </div>
       </div>
+
+      {expectMonosyllabic && <MonosyllabicCheck words={words} />}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <div>
@@ -201,20 +223,88 @@ export function PhonemeBalanceChart({ tokens, className }: Props) {
               ))}
             </div>
           </div>
-          <ArticulatorySection tokens={tokens} />
+          <ArticulatorySection tokens={words} />
         </div>
       </div>
 
+      {showMinimalPairs && <MinimalPairsSection words={words} />}
+
       <div className="text-[9px] text-[var(--muted-foreground)] border-t border-[var(--border)]/40 pt-1">
-        Score = 100 − Σ|obs−esperado|. Verde: sobre-representado (+), ámbar: sub-representado (−).
-        Frecuencias esperadas del corpus CREA/RAE. Ideal para listas tipo Tato/PAL es desviación ≤15 puntos.
+        Score = chi-cuadrado normalizado (100·e^(-χ²/df)). ≥70 balanceado · ≥45 aceptable · &lt;20 muy desbalanceado.
+        Verde: sobre-representado (+), ámbar: sub-representado (−). Frecuencias esperadas del corpus CREA/RAE.
       </div>
+    </div>
+  )
+}
+
+function MonosyllabicCheck({ words }: { words: string[] }) {
+  const nonMono = words.filter(w => analyze(w).syllable_count !== 1)
+  if (nonMono.length === 0) {
+    return (
+      <div className="rounded-md border border-emerald-500/30 bg-emerald-500/5 p-2 text-[10px] text-emerald-700">
+        ✓ Todos los tokens son monosílabos ({words.length}).
+      </div>
+    )
+  }
+  return (
+    <div className="rounded-md border border-amber-500/40 bg-amber-500/5 p-2 text-[10px] text-amber-700">
+      <b>Atención:</b> {nonMono.length} de {words.length} tokens no son monosílabos:
+      <span className="ml-1 font-mono">{nonMono.slice(0, 6).join(', ')}{nonMono.length > 6 ? `, +${nonMono.length - 6}` : ''}</span>
+    </div>
+  )
+}
+
+function MinimalPairsSection({ words }: { words: string[] }) {
+  const [open, setOpen] = useState(false)
+  const pairs = useMemo(() => findMinimalPairs(words), [words])
+  if (words.length < 2) return null
+
+  const byContrast: Record<MinimalPairContrast, { a: string; b: string }[]> = {
+    voicing: [], manner: [], place: [], nasal_oral: [], vowel: [], rhotic: [], other: [],
+  }
+  for (const p of pairs) byContrast[p.contrast].push({ a: p.a, b: p.b })
+
+  const total = pairs.length
+  const coverage = total / Math.max(1, words.length / 2) // pares por palabra
+
+  return (
+    <div className="rounded-md border border-[var(--border)]/40 bg-[var(--secondary)]/20 p-2 space-y-1">
+      <button type="button" onClick={() => setOpen(v => !v)} className="w-full flex items-center gap-1 text-[11px] font-medium">
+        {open ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+        <span>Pares mínimos (PALPA)</span>
+        <span className="ml-auto text-[10px] text-[var(--muted-foreground)]">
+          {total} pares · {coverage >= 0.8 ? <b className="text-emerald-600">cobertura buena</b> : coverage >= 0.3 ? <b className="text-sky-700">parcial</b> : <b className="text-amber-600">baja</b>}
+        </span>
+      </button>
+      {open && (
+        <div className="pt-1 space-y-1">
+          {(Object.keys(byContrast) as MinimalPairContrast[]).map(k => {
+            const arr = byContrast[k]
+            if (arr.length === 0) return null
+            return (
+              <div key={k} className="text-[10px]">
+                <span className="font-semibold w-28 inline-block">{CONTRAST_LABELS[k]}</span>
+                <span className="text-[var(--muted-foreground)]">({arr.length}) </span>
+                <span className="font-mono">{arr.slice(0, 8).map(p => `${p.a}↔${p.b}`).join(', ')}{arr.length > 8 ? ` +${arr.length - 8}` : ''}</span>
+              </div>
+            )
+          })}
+          {total === 0 && <div className="text-[10px] text-[var(--muted-foreground)]">No se detectaron pares mínimos (distancia 1) en la lista.</div>}
+        </div>
+      )}
     </div>
   )
 }
 
 function ArticulatorySection({ tokens }: { tokens: string[] }) {
   const stats = articulatoryStats(tokens)
+  const suggestions = useMemo(() => generateSuggestions({
+    stats,
+    expectedManner: EXPECTED_MANNER_PCT,
+    expectedPlace: EXPECTED_PLACE_PCT,
+    expectedOpenPct: EXPECTED_OPEN_PCT,
+  }), [stats])
+
   if (stats.total_consonants === 0) return null
 
   const mannerPct = (k: Manner) => (stats.manner[k] / stats.total_consonants) * 100
@@ -327,6 +417,26 @@ function ArticulatorySection({ tokens }: { tokens: string[] }) {
           </div>
         </div>
       </div>
+
+      {suggestions.length > 0 && (
+        <div className="rounded border border-[var(--border)]/40 bg-[var(--background)]/40 p-2 space-y-1">
+          <div className="flex items-center gap-1 text-[10px] font-semibold">
+            <Info className="w-3 h-3" />
+            Sugerencias para mejorar balance
+          </div>
+          <ul className="space-y-0.5">
+            {suggestions.slice(0, 6).map((s, i) => (
+              <li key={i} className={`text-[10px] ${s.severity === 'warn' ? 'text-amber-700' : 'text-[var(--foreground)]'}`}>
+                <span className={`inline-block w-1.5 h-1.5 rounded-full mr-1.5 ${s.severity === 'warn' ? 'bg-amber-500' : 'bg-sky-500'}`} />
+                {s.text}
+              </li>
+            ))}
+          </ul>
+          {suggestions.length > 6 && (
+            <div className="text-[9px] text-[var(--muted-foreground)]">+{suggestions.length - 6} sugerencias más (ajustá las primeras y revisá el chart).</div>
+          )}
+        </div>
+      )}
     </div>
   )
 }

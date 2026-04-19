@@ -402,7 +402,7 @@ export function SRTConfigEditor({ value, onChange, disabled, onGoToRecord }: Pro
             )}
 
             {showChart && items.length > 0 && (
-              <PhonemeBalanceChart tokens={items.map(s => s.token)} />
+              <PhonemeBalanceChart tokens={items.map(s => s.token)} showMinimalPairs />
             )}
 
             {items.length === 0 ? (

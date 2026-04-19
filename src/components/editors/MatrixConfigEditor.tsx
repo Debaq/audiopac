@@ -12,6 +12,7 @@ import {
 } from '@/lib/db/stimuli'
 import { getListReadiness, type ListReadiness } from '@/lib/packs/readiness'
 import { InlineListCreator } from './InlineListCreator'
+import { PhonemeBalanceChart } from '@/components/PhonemeBalanceChart'
 import type { MatrixParams, NoiseType, Stimulus, StimulusList } from '@/types'
 
 const DEFAULT_COLUMN_LABELS = ['Nombre', 'Verbo', 'Número', 'Objeto', 'Adjetivo']
@@ -348,6 +349,13 @@ export function MatrixConfigEditor({ value, onChange, disabled, onGoToRecord }: 
                     Lista vacía. Agregá palabras en <code>/estímulos</code>.
                   </p>
                 )}
+
+                {items.length > 0 && (
+                  <>
+                    <PhonemeBalanceChart tokens={items.map(s => s.token)} />
+                    <MatrixPerColumnStats byColumn={byColumn} labels={columnLabels} />
+                  </>
+                )}
               </div>
             ) : (
               <div className="rounded-md border border-dashed border-[var(--border)] p-6 text-center text-xs text-[var(--muted-foreground)]">
@@ -370,6 +378,31 @@ export function MatrixConfigEditor({ value, onChange, disabled, onGoToRecord }: 
         )}
       </CardContent>
     </Card>
+  )
+}
+
+function MatrixPerColumnStats({ byColumn, labels }: { byColumn: Stimulus[][]; labels: string[] }) {
+  return (
+    <div className="rounded-md border border-[var(--border)]/40 bg-[var(--secondary)]/20 p-2 text-[10px] space-y-0.5">
+      <div className="font-semibold text-[11px] mb-1">Balance por columna (longitud / variedad)</div>
+      {byColumn.map((toks, ci) => {
+        if (toks.length === 0) return <div key={ci} className="text-amber-600">{labels[ci]}: vacía</div>
+        const lens = toks.map(t => t.token.length)
+        const minL = Math.min(...lens), maxL = Math.max(...lens)
+        const uniqInitials = new Set(toks.map(t => t.token[0]?.toLowerCase() ?? '')).size
+        return (
+          <div key={ci} className="flex gap-3">
+            <span className="font-semibold w-20">{labels[ci]}</span>
+            <span className="text-[var(--muted-foreground)]">{toks.length} tokens</span>
+            <span className="text-[var(--muted-foreground)]">longitud {minL}-{maxL} chars</span>
+            <span className="text-[var(--muted-foreground)]">{uniqInitials} iniciales distintas</span>
+          </div>
+        )
+      })}
+      <div className="text-[9px] text-[var(--muted-foreground)] pt-1 border-t border-[var(--border)]/40">
+        Matrix idealmente: 10 tokens/col, longitud similar entre columnas, iniciales variadas para forzar discriminación.
+      </div>
+    </div>
   )
 }
 

@@ -242,7 +242,7 @@ export function HINTConfigEditor({ value, onChange, disabled, onGoToRecord }: Pr
                 )}
 
                 {showChart && items.length > 0 && (
-                  <PhonemeBalanceChart tokens={items.map(s => s.token)} />
+                  <PhonemeBalanceChart tokens={items.map(s => s.token)} mode="sentence" />
                 )}
 
                 {items.length === 0 ? (

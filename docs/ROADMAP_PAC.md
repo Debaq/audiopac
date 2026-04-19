@@ -1022,13 +1022,16 @@ Prioridad (ruta C mixta ya definida en §8.6.6 — primero expandir schemas, esc
 6. ✅ **HINT editor** (§8.6.4) — knobs básicos de `HINTParams` + 2 cols + SharedConfigSection + AdvancedJsonEditor + balance fonémico.
 7. ✅ **Matrix editor** (§8.6.4) — grid de asignación `metadata.column` por token + auto-asignación en secuencia.
 
-##### 8.6.6.6 Próximas ampliaciones del análisis fonético
+##### 8.6.6.6 Ampliaciones del análisis fonético ✅ hecho
 
-- **Sugerencias automáticas**: "te faltan fricativas velares (/x/) — agregá 'jota, joya, jugo'" basado en desviación por clase articulatoria.
-- **Score chi-square** propio: reemplazar `100 − Σ|diff|` por chi-cuadrado normalizado contra el corpus de referencia, más riguroso estadísticamente.
-- **Balance por contraste mínimo** (útil para PALPA): detectar si la lista tiene pares mínimos suficientes (sordo/sonoro, nasal/oral, etc.) para discriminación.
-- **Cross-engine**: aplicar `PhonemeBalanceChart` también en Dichotic (verificar monosilabicidad), HINT (frases → longitud media, balance por frase), Matrix (5-AFC vale para cada columna).
-- **Preview TTS opcional**: pronunciar un token dudoso vía Web Speech API `speechSynthesis` (ES-ES / ES-MX) para verificar acentuación sin grabar.
+- ✅ **Score chi-square normalizado** (`chiSquareScore` en `src/lib/es/phonetics.ts`): reemplaza `100 − Σ|diff|` por `100·e^(-χ²/df)`. Penaliza relativamente (celdas con esperado bajo + muchos observados pesan más). Umbrales UI: ≥70 balanceado, ≥45 aceptable, <20 muy desbalanceado.
+- ✅ **Sugerencias automáticas** (`src/lib/es/suggestions.ts` + `generateSuggestions`): detecta desvíos por modo/punto articulatorio, estructura silábica y sonoridad. Devuelve mensajes con ejemplos léxicos concretos (ej. "faltan fricativas velares → jota, joya, jugo"). Renderizadas como lista con bullet warn/info en `ArticulatorySection`.
+- ✅ **Pares mínimos** (`findMinimalPairs` en `phonetics.ts`): detecta tokens a edit-distance 1 y clasifica contraste (`voicing`/`manner`/`place`/`nasal_oral`/`vowel`/`rhotic`). Prop `showMinimalPairs` en `PhonemeBalanceChart` activa sección colapsable agrupada por tipo de contraste (activada en SRT editor para listas tipo PALPA/discriminación).
+- ✅ **Cross-engine**:
+  - Dichotic (`DichoticConfigEditor`): chart con prop `expectMonosyllabic` — banner verde/ámbar validando monosilabicidad de todos los tokens.
+  - HINT (`HINTConfigEditor`): chart con prop `mode='sentence'` — tokeniza frases en palabras antes de analizar, muestra conteo (N palabras de M frases).
+  - Matrix (`MatrixConfigEditor`): chart global + `MatrixPerColumnStats` (longitud min-max, iniciales distintas por columna).
+- ✅ **Preview TTS** en `TokenInfoDialog`: dropdown de locale (ES-ES/ES-MX/ES-US/ES-AR + detección de voces instaladas via `getVoices()`), botón "Pronunciar" con `speechSynthesis` rate 0.9. Locale persistido en `localStorage` (`audiopac.tts.locale`). Disclaimer: preview sintético, no reemplaza la grabación.
 
 ---
 
