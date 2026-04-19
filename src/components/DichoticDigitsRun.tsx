@@ -230,7 +230,7 @@ export function DichoticDigitsRun({ session, template, patient, params, preview 
               Graba los dígitos de la lista antes de correr la prueba.
             </p>
             <div className="flex gap-2">
-              <Button onClick={() => navigate('/estimulos')}>Ir a Estímulos</Button>
+              <Button onClick={() => navigate('/estimulos')}>Ir a Estudio</Button>
               <Button variant="outline" onClick={handleCancel}>Cancelar sesión</Button>
             </div>
           </CardContent>

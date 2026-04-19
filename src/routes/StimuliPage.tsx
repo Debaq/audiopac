@@ -280,10 +280,10 @@ export function StimuliPage() {
   const progress = items.length === 0 ? 0 : Math.round((recordedCount / items.length) * 100)
 
   return (
-    <div className="p-8 max-w-5xl mx-auto">
-      <div className="mb-6 flex items-start justify-between gap-3">
+    <div className="p-6 h-full flex flex-col gap-4">
+      <div className="flex items-start justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bold">Estímulos verbales</h1>
+          <h1 className="text-3xl font-bold">Estudio</h1>
           <p className="text-[var(--muted-foreground)]">
             Graba, procesa y normaliza listas para logoaudiometría y PAC verbales.
           </p>
@@ -295,14 +295,11 @@ export function StimuliPage() {
         )}
       </div>
 
-      <Card className="mb-4">
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-base">
+      <Card>
+        <CardContent className="flex flex-wrap items-center gap-3 py-3">
+          <span className="inline-flex items-center gap-1.5 text-sm font-medium">
             <Globe className="w-4 h-4" /> País / dialecto
-          </CardTitle>
-          <CardDescription>Filtra listas por país. Las listas LatAm son visibles para todos.</CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-wrap items-center gap-3">
+          </span>
           <Select
             value={countryCode}
             onChange={e => setCountryCode(e.target.value)}
@@ -324,12 +321,12 @@ export function StimuliPage() {
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-3 gap-4 mb-4">
-        <Card className="col-span-1">
+      <div className="grid grid-cols-12 gap-4 flex-1 min-h-0">
+        <Card className="col-span-4 flex flex-col min-h-0">
           <CardHeader className="pb-3">
             <CardTitle className="text-base">Listas</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-2">
+          <CardContent className="space-y-2 flex flex-col flex-1 min-h-0">
             <SearchBar value={listQuery} onChange={setListQuery} placeholder="Buscar lista..." className="mb-1" />
             <div className="overflow-x-auto -mx-1 px-1 pb-1">
               <FilterChips options={catOptions} value={catFilter} onChange={setCatFilter} className="flex-nowrap" />
@@ -338,6 +335,7 @@ export function StimuliPage() {
             {lists.length > 0 && filteredLists.length === 0 && (
               <p className="text-xs text-[var(--muted-foreground)]">Sin coincidencias.</p>
             )}
+            <div className="space-y-2 flex-1 min-h-0 overflow-y-auto pr-1">
             {filteredLists.map(l => (
               <div
                 key={l.id}
@@ -360,6 +358,7 @@ export function StimuliPage() {
                 )}
               </div>
             ))}
+            </div>
 
             <div className="pt-2 border-t border-[var(--border)]/50 mt-3 space-y-2">
               <Input placeholder="Nombre nueva lista" value={newListName} onChange={e => setNewListName(e.target.value)} />
@@ -378,10 +377,10 @@ export function StimuliPage() {
           </CardContent>
         </Card>
 
-        <div className="col-span-2 space-y-4">
+        <div className="col-span-8 flex flex-col gap-4 min-h-0">
           {selectedList ? (
             <>
-              <Card>
+              <Card className="flex flex-col flex-1 min-h-0">
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between gap-3">
                     <div>
@@ -396,7 +395,7 @@ export function StimuliPage() {
                     </div>
                   </div>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="flex flex-col flex-1 min-h-0">
                   <div className="flex gap-2 mb-3">
                     <Input
                       placeholder="Nuevo token (palabra / frase)"
@@ -422,7 +421,7 @@ export function StimuliPage() {
                       Sin tokens. Agregá palabras arriba o editá la lista.
                     </p>
                   ) : (
-                    <div className="space-y-1.5">
+                    <div className="space-y-1.5 flex-1 min-h-0 overflow-y-auto pr-1">
                       {items.map(s => {
                         const isRec = recordingId === s.id
                         const isBusy = busyId === s.id

@@ -177,7 +177,7 @@ export function MatrixRun({ session, template, patient, params, preview = false 
           <CardContent className="space-y-3 text-sm">
             <p>{loadError}</p>
             <div className="flex gap-2">
-              <Button onClick={() => navigate('/estimulos')}>Ir a Estímulos</Button>
+              <Button onClick={() => navigate('/estimulos')}>Ir a Estudio</Button>
               <Button variant="outline" onClick={handleCancel}>Cancelar sesión</Button>
             </div>
           </CardContent>

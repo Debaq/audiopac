@@ -243,7 +243,7 @@ export function SRTRun({ session, template, patient, params, preview = false }: 
               Graba los estímulos de la lista antes de correr la prueba.
             </p>
             <div className="flex gap-2">
-              <Button onClick={() => navigate('/estimulos')}>Ir a Estímulos</Button>
+              <Button onClick={() => navigate('/estimulos')}>Ir a Estudio</Button>
               <Button variant="outline" onClick={handleCancel}>Cancelar sesión</Button>
             </div>
           </CardContent>

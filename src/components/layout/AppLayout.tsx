@@ -12,7 +12,7 @@ const navItems = [
   { to: '/evaluacion', label: 'Evaluación', icon: Activity },
   { to: '/tests', label: 'Tests', icon: Settings2 },
   { to: '/informes', label: 'Informes', icon: FileText },
-  { to: '/estimulos', label: 'Estímulos', icon: Mic },
+  { to: '/estimulos', label: 'Estudio', icon: Mic },
   { to: '/catalogos', label: 'Catálogos', icon: Package },
   { to: '/calibracion', label: 'Calibración', icon: Gauge },
   { to: '/roadmap', label: 'Roadmap', icon: Map },
