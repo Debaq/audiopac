@@ -46,15 +46,16 @@ function cmp(sort: SortKey): (a: TestTemplateParsed, b: TestTemplateParsed) => n
   }
 }
 
-type EngineKey = 'patterns' | 'srt' | 'dichotic' | 'hint' | 'matrix'
+type EngineKey = 'patterns' | 'srt' | 'dichotic' | 'hint' | 'matrix' | 'ssw'
 
-const ENGINES_WITH_EDITOR: ReadonlySet<EngineKey> = new Set(['patterns', 'srt', 'dichotic', 'hint', 'matrix'])
+const ENGINES_WITH_EDITOR: ReadonlySet<EngineKey> = new Set(['patterns', 'srt', 'dichotic', 'hint', 'matrix', 'ssw'])
 
 function detectEngine(cfg: TestTemplateParsed['config']): EngineKey {
   if (cfg.srt) return 'srt'
   if (cfg.dichotic_digits) return 'dichotic'
   if (cfg.hint) return 'hint'
   if (cfg.matrix) return 'matrix'
+  if (cfg.ssw) return 'ssw'
   return 'patterns'
 }
 
@@ -64,6 +65,7 @@ const ENGINES: Array<{ key: EngineKey; label: string; desc: string; enabled: boo
   { key: 'dichotic', label: 'Dichotic Digits', desc: 'Dígitos simultáneos por oído, recuerdo libre/dirigido.', enabled: true },
   { key: 'hint', label: 'HINT / SinB', desc: 'Frases en ruido con SNR adaptativo.', enabled: true },
   { key: 'matrix', label: 'Matrix 5-AFC', desc: 'Oraciones matriciales con grid 5×10 y SNR adaptativo.', enabled: true },
+  { key: 'ssw', label: 'SSW (Staggered Spondaic Word)', desc: 'Palabras espondaicas dicóticas escalonadas, 4 condiciones (RNC/RC/LC/LNC).', enabled: true },
 ]
 
 export function TestsPage() {
@@ -520,9 +522,6 @@ export function TestsPage() {
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <p className="text-sm text-[var(--muted-foreground)] mb-4">
-              Cada motor define el paradigma de evaluación. Hoy solo el editor de patrones tonales está disponible; los otros motores se usan vía packs estándar.
-            </p>
             <div className="space-y-2">
               {ENGINES.map(e => (
                 <button

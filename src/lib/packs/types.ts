@@ -20,6 +20,7 @@ export type StimulusListCategory =
   | 'discrimination'
   | 'dichotic_digits'
   | 'sentence'
+  | 'ssw'
   | 'custom'
 
 export type TestType = 'DPS' | 'PPS' | 'CUSTOM'

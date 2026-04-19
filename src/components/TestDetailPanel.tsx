@@ -14,13 +14,14 @@ import { fetchPacksIndex } from '@/lib/packs/installer'
 import type { PackRequirements } from '@/lib/packs/types'
 import type { TestConfig, TestTemplateParsed } from '@/types'
 
-type EngineKey = 'patterns' | 'srt' | 'dichotic' | 'hint' | 'matrix'
-const ENGINES_WITH_EDITOR: ReadonlySet<EngineKey> = new Set(['patterns', 'srt', 'dichotic', 'hint', 'matrix'])
+type EngineKey = 'patterns' | 'srt' | 'dichotic' | 'hint' | 'matrix' | 'ssw'
+const ENGINES_WITH_EDITOR: ReadonlySet<EngineKey> = new Set(['patterns', 'srt', 'dichotic', 'hint', 'matrix', 'ssw'])
 function detectEngine(cfg: TestConfig): EngineKey {
   if (cfg.srt) return 'srt'
   if (cfg.dichotic_digits) return 'dichotic'
   if (cfg.hint) return 'hint'
   if (cfg.matrix) return 'matrix'
+  if (cfg.ssw) return 'ssw'
   return 'patterns'
 }
 
