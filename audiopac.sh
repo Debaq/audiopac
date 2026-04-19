@@ -511,6 +511,34 @@ menu_loop() {
 }
 
 # ── Ayuda CLI ────────────────────────────────────────────────────────────────
+cmd_setup_hooks() {
+    header "Instalando git hooks"
+    local src_dir="$PROJECT_DIR/scripts/git-hooks"
+    local dst_dir="$PROJECT_DIR/.git/hooks"
+    if [[ ! -d "$src_dir" ]]; then
+        error "No existe $src_dir"
+        return 1
+    fi
+    if [[ ! -d "$dst_dir" ]]; then
+        error "No existe $dst_dir (¿este es un repo git?)"
+        return 1
+    fi
+    local count=0
+    for hook in "$src_dir"/*; do
+        [[ -f "$hook" ]] || continue
+        local name="$(basename "$hook")"
+        chmod +x "$hook"
+        ln -sf "../../scripts/git-hooks/$name" "$dst_dir/$name"
+        success "$name → enlazado"
+        count=$((count + 1))
+    done
+    if [[ $count -eq 0 ]]; then
+        warn "Sin hooks que instalar."
+    else
+        success "Listo ($count hook(s))."
+    fi
+}
+
 cmd_help() {
     echo -e "${BOLD}${MAGENTA}AudioPAC v$VERSION${NC}"
     echo -e "${DIM}Software para evaluacion del Procesamiento Auditivo Central${NC}"
@@ -531,6 +559,7 @@ cmd_help() {
     echo "  db:reset       Borrar base de datos local"
     echo "  clean          Limpiar dist/ + cargo clean"
     echo "  release        Nuevo release (bump + tag + push + GH Actions)"
+    echo "  setup-hooks    Instalar git hooks versionados en .git/hooks"
     echo "  help           Esta ayuda"
 }
 
@@ -557,6 +586,7 @@ main() {
         db:reset)       cmd_db_reset ;;
         clean)          cmd_clean ;;
         release)        cmd_release ;;
+        setup-hooks)    cmd_setup_hooks ;;
         help|--help|-h) cmd_help ;;
         *)              error "Comando desconocido: $1"; cmd_help; exit 1 ;;
     esac

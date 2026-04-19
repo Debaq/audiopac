@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+# pre-push: avisa si el repo hermano audiopac-assets tiene cambios sin commitear
+# o commits sin pushear. Bypass: git push --no-verify
+set -e
+
+ASSETS_DIR="$(git rev-parse --show-toplevel)/assets"
+
+if [ ! -d "$ASSETS_DIR/.git" ] && [ ! -L "$ASSETS_DIR" ]; then
+  exit 0
+fi
+
+cd "$ASSETS_DIR"
+
+DIRTY=""
+if ! git diff --quiet --ignore-submodules HEAD 2>/dev/null; then
+  DIRTY="cambios sin commitear"
+fi
+if [ -n "$(git status --porcelain --untracked-files=normal 2>/dev/null)" ]; then
+  DIRTY="${DIRTY:+$DIRTY + }archivos sin trackear"
+fi
+
+UNPUSHED=""
+UPSTREAM=$(git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null || true)
+if [ -n "$UPSTREAM" ]; then
+  AHEAD=$(git rev-list --count "$UPSTREAM"..HEAD 2>/dev/null || echo 0)
+  if [ "$AHEAD" -gt 0 ]; then
+    UNPUSHED="$AHEAD commit(s) sin pushear"
+  fi
+fi
+
+if [ -n "$DIRTY" ] || [ -n "$UNPUSHED" ]; then
+  echo ""
+  echo "⚠️  audiopac-assets tiene pendientes:"
+  [ -n "$DIRTY" ]    && echo "   • $DIRTY"
+  [ -n "$UNPUSHED" ] && echo "   • $UNPUSHED"
+  echo ""
+  echo "   cd assets && git status"
+  echo ""
+  echo "   Para pushear igual: git push --no-verify"
+  echo ""
+  exit 1
+fi
+
+exit 0
