@@ -218,6 +218,8 @@ export interface TestSession {
   completed_at: string | null
 }
 
+export type CalibWeighting = 'A' | 'C' | 'Z'
+
 export interface CalibrationPoint {
   id: number
   calibration_id: number
@@ -226,6 +228,7 @@ export interface CalibrationPoint {
   internal_level_dbfs: number
   measured_db_spl: number
   ref_db_spl: number
+  weighting: CalibWeighting
   created_at: string
 }
 
@@ -238,6 +241,7 @@ export interface NoiseCalibrationPoint {
   internal_level_dbfs: number
   measured_db_spl: number
   ref_db_spl: number
+  weighting: CalibWeighting
   created_at: string
 }
 

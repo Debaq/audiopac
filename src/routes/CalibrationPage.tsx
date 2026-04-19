@@ -14,6 +14,8 @@ import {
   upsertNoisePoint, listNoisePoints, deleteNoisePoint,
 } from '@/lib/db/calibrations'
 import { listAudioOutputs, requestDeviceLabelPermission, type AudioOutputDevice } from '@/lib/audio/device'
+import { noiseToZ, toneToZ, WEIGHTING_OPTIONS, type Weighting } from '@/lib/audio/weighting'
+import { CouplerSection } from '@/components/CouplerSection'
 import { useCalibrationStore } from '@/stores/calibration'
 import { useAuth } from '@/stores/auth'
 import type { Calibration, CalibrationPoint, Ear, NoiseCalibrationPoint, NoiseCalibType } from '@/types'
@@ -21,6 +23,8 @@ import { formatDateTime } from '@/lib/utils'
 
 const DEFAULT_DBFS = -20
 const STD_FREQS = [250, 500, 1000, 2000, 4000, 8000]
+// Feature flag: sección de coupler DIY. Activar cuando el modelo 3D esté listo.
+const SHOW_COUPLER_SECTION = false
 const EARS: Ear[] = ['left', 'right']
 const NOISE_TYPES: { code: NoiseCalibType; label: string; hint: string }[] = [
   { code: 'pink', label: 'Rosa', hint: 'HINT, SinB voz+ruido genérico' },
@@ -47,6 +51,7 @@ export function CalibrationPage() {
   const [selEar, setSelEar] = useState<Ear>('left')
   const [dbfs, setDbfs] = useState<number>(DEFAULT_DBFS)
   const [measured, setMeasured] = useState<string>('')
+  const [toneWeighting, setToneWeighting] = useState<Weighting>('Z')
   const [isPlaying, setIsPlaying] = useState(false)
   const stopRef = useRef<(() => void) | null>(null)
 
@@ -57,6 +62,7 @@ export function CalibrationPage() {
   const [noiseType, setNoiseType] = useState<NoiseCalibType>('pink')
   const [noiseDbfs, setNoiseDbfs] = useState<number>(DEFAULT_DBFS)
   const [noiseMeasured, setNoiseMeasured] = useState<string>('')
+  const [noiseWeighting, setNoiseWeighting] = useState<Weighting>('Z')
   const [isNoisePlaying, setIsNoisePlaying] = useState(false)
   const noiseStopRef = useRef<(() => void) | null>(null)
 
@@ -112,13 +118,15 @@ export function CalibrationPage() {
     if (!activeCal) { alert('Activá una calibración primero'); return }
     const m = Number(noiseMeasured)
     if (!Number.isFinite(m)) { alert('Ingresá el dB SPL medido'); return }
-    const refDb = m - noiseDbfs
+    const mZ = noiseToZ(m, noiseWeighting, noiseType)
+    const refDb = mZ - noiseDbfs
     await upsertNoisePoint({
       calibration_id: activeCal.id,
       noise_type: noiseType,
       internal_level_dbfs: noiseDbfs,
-      measured_db_spl: m,
+      measured_db_spl: mZ,
       ref_db_spl: refDb,
+      weighting: noiseWeighting,
     })
     setNoiseMeasured('')
     refreshAll()
@@ -129,8 +137,10 @@ export function CalibrationPage() {
     refreshAll()
   }
 
-  const noisePreview = Number(noiseMeasured) - noiseDbfs
   const noisePreviewOk = Number.isFinite(Number(noiseMeasured))
+  const noisePreview = noisePreviewOk
+    ? noiseToZ(Number(noiseMeasured), noiseWeighting, noiseType) - noiseDbfs
+    : 0
   const noisePointFor = (t: NoiseCalibType) => activeNoisePoints.find(p => p.noise_type === t)
 
   const grantPermission = async () => {
@@ -176,14 +186,16 @@ export function CalibrationPage() {
     if (!activeCal) { alert('Creá o activá una calibración primero'); return }
     const m = Number(measured)
     if (!Number.isFinite(m)) { alert('Ingresá el dB SPL medido'); return }
-    const refDb = m - dbfs
+    const mZ = toneToZ(m, toneWeighting, selFreq)
+    const refDb = mZ - dbfs
     await upsertPoint({
       calibration_id: activeCal.id,
       frequency_hz: selFreq,
       ear: selEar,
       internal_level_dbfs: dbfs,
-      measured_db_spl: m,
+      measured_db_spl: mZ,
       ref_db_spl: refDb,
+      weighting: toneWeighting,
     })
     setMeasured('')
     refreshAll()
@@ -205,8 +217,10 @@ export function CalibrationPage() {
     refreshAll()
   }
 
-  const preview = Number(measured) - dbfs
   const previewOk = Number.isFinite(Number(measured))
+  const preview = previewOk
+    ? toneToZ(Number(measured), toneWeighting, selFreq) - dbfs
+    : 0
 
   const pointFor = (f: number, e: Ear) => activePoints.find(p => p.frequency_hz === f && p.ear === e)
 
@@ -310,7 +324,7 @@ export function CalibrationPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-4 gap-4">
               <div>
                 <Label>Oído</Label>
                 <Select value={selEar} onChange={e => setSelEar(e.target.value as Ear)}>
@@ -324,7 +338,19 @@ export function CalibrationPage() {
                 <Input type="number" step="1" value={dbfs} onChange={e => setDbfs(Number(e.target.value))} />
               </div>
               <div>
-                <Label>dB SPL medido</Label>
+                <Label>Ponderación sonómetro</Label>
+                <Select
+                  value={toneWeighting}
+                  onChange={e => setToneWeighting(e.target.value as Weighting)}
+                  title={WEIGHTING_OPTIONS.find(o => o.code === toneWeighting)?.hint}
+                >
+                  {WEIGHTING_OPTIONS.map(o => (
+                    <option key={o.code} value={o.code}>{o.label}</option>
+                  ))}
+                </Select>
+              </div>
+              <div>
+                <Label>Lectura del sonómetro ({toneWeighting === 'Z' ? 'dB SPL' : `dB${toneWeighting}`})</Label>
                 <Input type="number" step="0.1" value={measured} placeholder="ej. 74" onChange={e => setMeasured(e.target.value)} />
               </div>
             </div>
@@ -368,9 +394,12 @@ export function CalibrationPage() {
                             key={f}
                             className={`p-1.5 border-b border-[var(--border)]/40 text-center cursor-pointer ${isSel ? 'bg-[var(--primary)]/10' : ''} ${pt ? 'text-emerald-600 font-semibold' : 'text-[var(--muted-foreground)]'}`}
                             onClick={() => { setSelFreq(f); setSelEar(e) }}
-                            title={pt ? `Ref ${pt.ref_db_spl.toFixed(1)} dB SPL` : 'Sin medir'}
+                            title={pt ? `Ref ${pt.ref_db_spl.toFixed(1)} dB SPL (medido con ${pt.weighting ?? 'Z'})` : 'Sin medir'}
                           >
                             {pt ? pt.ref_db_spl.toFixed(0) : '—'}
+                            {pt?.weighting && pt.weighting !== 'Z' && (
+                              <span className="ml-0.5 text-[10px] text-[var(--muted-foreground)]">{pt.weighting}</span>
+                            )}
                             {pt && (
                               <button
                                 className="ml-1 text-red-500 hover:underline"
@@ -425,13 +454,25 @@ export function CalibrationPage() {
               </p>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-3 gap-4">
               <div>
                 <Label>Nivel interno (dBFS)</Label>
                 <Input type="number" step="1" value={noiseDbfs} onChange={e => setNoiseDbfs(Number(e.target.value))} />
               </div>
               <div>
-                <Label>dB SPL medido</Label>
+                <Label>Ponderación sonómetro</Label>
+                <Select
+                  value={noiseWeighting}
+                  onChange={e => setNoiseWeighting(e.target.value as Weighting)}
+                  title={WEIGHTING_OPTIONS.find(o => o.code === noiseWeighting)?.hint}
+                >
+                  {WEIGHTING_OPTIONS.map(o => (
+                    <option key={o.code} value={o.code}>{o.label}</option>
+                  ))}
+                </Select>
+              </div>
+              <div>
+                <Label>Lectura del sonómetro ({noiseWeighting === 'Z' ? 'dB SPL' : `dB${noiseWeighting}`})</Label>
                 <Input type="number" step="0.1" value={noiseMeasured} placeholder="ej. 70" onChange={e => setNoiseMeasured(e.target.value)} />
               </div>
             </div>
@@ -457,7 +498,8 @@ export function CalibrationPage() {
                   <tr>
                     <th className="text-left p-1.5 border-b border-[var(--border)]">Tipo</th>
                     <th className="p-1.5 border-b border-[var(--border)] text-center">Ref (dB SPL @ 0 dBFS)</th>
-                    <th className="p-1.5 border-b border-[var(--border)] text-center">Medido</th>
+                    <th className="p-1.5 border-b border-[var(--border)] text-center">Medido (Z)</th>
+                    <th className="p-1.5 border-b border-[var(--border)] text-center">Ponderación</th>
                     <th className="p-1.5 border-b border-[var(--border)] text-center">Interno (dBFS)</th>
                     <th className="p-1.5 border-b border-[var(--border)] text-center"></th>
                   </tr>
@@ -476,6 +518,9 @@ export function CalibrationPage() {
                         </td>
                         <td className="p-1.5 border-b border-[var(--border)]/40 text-center">
                           {pt ? pt.measured_db_spl.toFixed(1) : '—'}
+                        </td>
+                        <td className="p-1.5 border-b border-[var(--border)]/40 text-center text-[var(--muted-foreground)]">
+                          {pt ? (pt.weighting ?? 'Z') : '—'}
                         </td>
                         <td className="p-1.5 border-b border-[var(--border)]/40 text-center">
                           {pt ? pt.internal_level_dbfs.toFixed(0) : '—'}
@@ -539,6 +584,8 @@ export function CalibrationPage() {
           )}
         </CardContent>
       </Card>
+
+      {SHOW_COUPLER_SECTION && <CouplerSection />}
     </div>
   )
 }

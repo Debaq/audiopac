@@ -31,5 +31,11 @@ pub fn get_migrations() -> Vec<Migration> {
             sql: include_str!("../migrations/004_ssw_catch.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 5,
+            description: "calibration_weighting",
+            sql: include_str!("../migrations/005_weighting.sql"),
+            kind: MigrationKind::Up,
+        },
     ]
 }

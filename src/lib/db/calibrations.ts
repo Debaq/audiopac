@@ -1,5 +1,5 @@
 import { getDb } from './client'
-import type { Calibration, CalibrationPoint, Ear, NoiseCalibrationPoint, NoiseCalibType } from '@/types'
+import type { CalibWeighting, Calibration, CalibrationPoint, Ear, NoiseCalibrationPoint, NoiseCalibType } from '@/types'
 
 export interface CreateCalibrationInput {
   label: string
@@ -56,20 +56,22 @@ export interface UpsertPointInput {
   internal_level_dbfs: number
   measured_db_spl: number
   ref_db_spl: number
+  weighting?: CalibWeighting
 }
 
 export async function upsertPoint(input: UpsertPointInput): Promise<void> {
   const db = await getDb()
   await db.execute(
     `INSERT INTO calibration_points
-       (calibration_id, frequency_hz, ear, internal_level_dbfs, measured_db_spl, ref_db_spl)
-     VALUES ($1,$2,$3,$4,$5,$6)
+       (calibration_id, frequency_hz, ear, internal_level_dbfs, measured_db_spl, ref_db_spl, weighting)
+     VALUES ($1,$2,$3,$4,$5,$6,$7)
      ON CONFLICT(calibration_id, frequency_hz, ear)
      DO UPDATE SET internal_level_dbfs=excluded.internal_level_dbfs,
                    measured_db_spl=excluded.measured_db_spl,
                    ref_db_spl=excluded.ref_db_spl,
+                   weighting=excluded.weighting,
                    created_at=datetime('now')`,
-    [input.calibration_id, input.frequency_hz, input.ear, input.internal_level_dbfs, input.measured_db_spl, input.ref_db_spl]
+    [input.calibration_id, input.frequency_hz, input.ear, input.internal_level_dbfs, input.measured_db_spl, input.ref_db_spl, input.weighting ?? 'Z']
   )
 }
 
@@ -124,20 +126,22 @@ export interface UpsertNoisePointInput {
   internal_level_dbfs: number
   measured_db_spl: number
   ref_db_spl: number
+  weighting?: CalibWeighting
 }
 
 export async function upsertNoisePoint(input: UpsertNoisePointInput): Promise<void> {
   const db = await getDb()
   await db.execute(
     `INSERT INTO noise_calibration_points
-       (calibration_id, noise_type, internal_level_dbfs, measured_db_spl, ref_db_spl)
-     VALUES ($1,$2,$3,$4,$5)
+       (calibration_id, noise_type, internal_level_dbfs, measured_db_spl, ref_db_spl, weighting)
+     VALUES ($1,$2,$3,$4,$5,$6)
      ON CONFLICT(calibration_id, noise_type)
      DO UPDATE SET internal_level_dbfs=excluded.internal_level_dbfs,
                    measured_db_spl=excluded.measured_db_spl,
                    ref_db_spl=excluded.ref_db_spl,
+                   weighting=excluded.weighting,
                    created_at=datetime('now')`,
-    [input.calibration_id, input.noise_type, input.internal_level_dbfs, input.measured_db_spl, input.ref_db_spl]
+    [input.calibration_id, input.noise_type, input.internal_level_dbfs, input.measured_db_spl, input.ref_db_spl, input.weighting ?? 'Z']
   )
 }
 
