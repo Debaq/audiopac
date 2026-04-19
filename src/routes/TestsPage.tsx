@@ -465,7 +465,16 @@ export function TestsPage() {
                                       return (
                                         <li>
                                           <button
-                                            onClick={() => setEngineDialog({ family: f.family ?? undefined })}
+                                            onClick={() => {
+                                              if (famEng) {
+                                                const qs = new URLSearchParams()
+                                                qs.set('engine', famEng)
+                                                if (f.family) qs.set('family', f.family)
+                                                navigate(`/tests/nuevo?${qs.toString()}`)
+                                              } else {
+                                                setEngineDialog({ family: f.family ?? undefined })
+                                              }
+                                            }}
                                             className="w-full text-left px-2 py-1.5 rounded text-sm flex items-center gap-2 text-[var(--primary)] hover:bg-[var(--primary)]/10"
                                           >
                                             <PlusCircle className="w-3.5 h-3.5 shrink-0" />
