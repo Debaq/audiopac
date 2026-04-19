@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Search, User, Settings2, FileText, Package, ArrowRight } from 'lucide-react'
+import { Search, User, Settings2, FileText, Package, ArrowRight, Map } from 'lucide-react'
 import { listPatients } from '@/lib/db/patients'
 import { listTemplates } from '@/lib/db/templates'
 import { listAllSessions } from '@/lib/db/sessions'
@@ -9,22 +9,27 @@ import type { Patient, TestTemplateParsed, SessionWithDetails } from '@/types'
 import type { InstalledPack } from '@/lib/packs/installer'
 import { cn } from '@/lib/utils'
 import { formatDate } from '@/lib/utils'
+import roadmapRaw from '../../docs/ROADMAP_PAC.md?raw'
+import { parseRoadmap, STATUS_META } from '@/lib/roadmapParser'
 
 type Item =
   | { kind: 'patient'; id: number; title: string; sub: string }
   | { kind: 'test'; id: number; title: string; sub: string }
   | { kind: 'session'; id: number; title: string; sub: string }
   | { kind: 'pack'; code: string; title: string; sub: string }
+  | { kind: 'roadmap'; id: string; title: string; sub: string }
+
+const ROADMAP_INDEX = parseRoadmap(roadmapRaw).all
 
 function norm(s: string): string {
   return s.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '')
 }
 
 const ICON: Record<Item['kind'], typeof User> = {
-  patient: User, test: Settings2, session: FileText, pack: Package,
+  patient: User, test: Settings2, session: FileText, pack: Package, roadmap: Map,
 }
 const LABEL: Record<Item['kind'], string> = {
-  patient: 'Paciente', test: 'Test', session: 'Informe', pack: 'Paquete',
+  patient: 'Paciente', test: 'Test', session: 'Informe', pack: 'Paquete', roadmap: 'Roadmap',
 }
 
 export function CommandPalette() {
@@ -91,6 +96,14 @@ export function CommandPalette() {
       if (!nq || norm(pk.name).includes(nq) || norm(pk.code).includes(nq))
         out.push({ kind: 'pack', code: pk.code, title: pk.name, sub: `${pk.code} · v${pk.version}` })
     }
+    if (nq) {
+      for (const rs of ROADMAP_INDEX) {
+        if (norm(rs.title).includes(nq)) {
+          const meta = STATUS_META[rs.status]
+          out.push({ kind: 'roadmap', id: rs.id, title: `${meta.emoji} ${rs.title}`, sub: `§${'#'.repeat(rs.level - 1)} ${meta.label}` })
+        }
+      }
+    }
     return out.slice(0, 50)
   }, [query, patients, tests, sessions, packs])
 
@@ -102,6 +115,7 @@ export function CommandPalette() {
     else if (it.kind === 'test') navigate(`/tests/${it.id}`)
     else if (it.kind === 'session') navigate(`/informes/${it.id}`)
     else if (it.kind === 'pack') navigate('/catalogos')
+    else if (it.kind === 'roadmap') navigate(`/roadmap#${it.id}`)
   }
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {

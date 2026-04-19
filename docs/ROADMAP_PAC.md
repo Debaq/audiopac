@@ -4,7 +4,7 @@ Documento vivo. Agrupa: pruebas PAC factibles, módulo de grabación de estímul
 
 ---
 
-## 1. Pruebas PAC con capacidades actuales
+## 1. Pruebas PAC con capacidades actuales ✅ hecho
 
 **Capacidades motor audio hoy** (`src/lib/audio/engine.ts`):
 
@@ -42,7 +42,7 @@ Se implementó vía patrón con separador `|`: `"LHL|HLH"` → parte izquierda a
 - ✅ **Fusión binaural tonal** (`FUSION_BIN`)
 - ✅ Detección de gap con cambio de frecuencia (`FGC_SCREEN`, mig 009). Micro-splice con ISI=0 + envolvente 2 ms. Patrones FFF (igual) / FGF (+200 Hz) / FHF (+500 Hz)
 
-### 1.4 No factibles sin infraestructura nueva (requieren Fase 1+)
+### 1.4 No factibles sin infraestructura nueva (requieren Fase 1+) ✅ hecho (vía Fases 1–6)
 
 Necesitan grabación/reproducción de buffers de audio o generador de ruido:
 
@@ -52,11 +52,11 @@ Necesitan grabación/reproducción de buffers de audio o generador de ruido:
 
 ---
 
-## 2. Módulo de grabación de estímulos verbales
+## 2. Módulo de grabación de estímulos verbales ✅ hecho (Fase 1)
 
 Objetivo: habilitar **logoaudiometría** (SRT, UCL, discriminación), **listas PAL/PALPA en español**, **dichotic digits ES**, **SSW adaptado**, **SinB-ES**, **frases HINT-ES**.
 
-### 2.1 Stack técnico
+### 2.1 Stack técnico ✅ hecho
 
 - Captura: `navigator.mediaDevices.getUserMedia` + `MediaRecorder` (WebM/Opus) o `AudioWorklet` para PCM crudo
 - Almacenamiento: archivos en `app_data_dir` (Tauri `plugin-fs`), path en SQLite. **NO blobs en BD** (infla el archivo).
@@ -65,7 +65,7 @@ Objetivo: habilitar **logoaudiometría** (SRT, UCL, discriminación), **listas P
   id, category, token, file_path, duration_ms, rms_dbfs, sample_rate, normalized, created_at
   ```
 
-### 2.2 Procesamiento mínimo viable (Web Audio API, sin deps nativas)
+### 2.2 Procesamiento mínimo viable (Web Audio API, sin deps nativas) ✅ hecho
 
 - **Trim silencios**: detección por RMS + umbral
 - **Normalización RMS/LUFS**: target -23 LUFS (broadcast) o -20 dBFS (habla clínica)
@@ -73,17 +73,17 @@ Objetivo: habilitar **logoaudiometría** (SRT, UCL, discriminación), **listas P
 - **Denoise básico**: spectral gating (FFT, umbral desde primeros 200 ms). Sin ML. Suficiente para clínica decente.
 - **Fade in/out**: evita clicks en bordes
 
-### 2.3 Fuera de MVP
+### 2.3 Fuera de MVP ⚠️ parcial (denoise espectral ya hecho en Fase 4; resto sin prioridad)
 
 Noise reduction avanzado (RNNoise), dereverb → requiere WASM o sidecar nativo. Posponer.
 
 ---
 
-## 3. Módulo de calibración con sonómetro
+## 3. Módulo de calibración con sonómetro ✅ hecho (Fases 2 + 3)
 
 Objetivo: que los dB reportados sean dB SPL reales, no pseudo-calibrados.
 
-### 3.1 Flujo de calibración
+### 3.1 Flujo de calibración ✅ hecho
 
 1. Generar tono patrón 1 kHz a nivel interno conocido (ej. -20 dBFS)
 2. Usuario reproduce con auriculares sobre acoplador (6cc supraaurales / 2cc intraaurales — ideal en laboratorio)
@@ -95,7 +95,7 @@ Objetivo: que los dB reportados sean dB SPL reales, no pseudo-calibrados.
    ```
 6. `dbToGain()` usa ese `ref_db` en vez del 85 hardcoded
 
-### 3.2 Advertencias obligatorias en UI
+### 3.2 Advertencias obligatorias en UI ✅ hecho
 
 - Calibración válida sólo para ese par de auriculares + dispositivo + volumen OS fijo. **Bloquear volumen SO al 100% o valor fijo**; si cambia, calibración muere.
 - Recalibrar cada 3–6 meses o al cambiar auriculares / tarjeta.
@@ -103,7 +103,7 @@ Objetivo: que los dB reportados sean dB SPL reales, no pseudo-calibrados.
 - Etiqueta en UI: "Uso investigativo / screening. No diagnóstico clínico certificado."
 - Calibrar por frecuencia idealmente (curva 250–8000 Hz), no sólo 1 kHz — auriculares no son planos.
 
-### 3.3 Features adicionales
+### 3.3 Features adicionales ✅ hecho
 
 - Detección de dispositivo de salida (`selectAudioOutput`) + aviso si cambia post-calibración
 - Test de verificación rápido pre-sesión: "reproduce tono de referencia, ¿escuchas cómodo?" (no reemplaza sonómetro, detecta cambios groseros de volumen OS)
@@ -112,7 +112,7 @@ Objetivo: que los dB reportados sean dB SPL reales, no pseudo-calibrados.
 
 ---
 
-## 4. Plan por fases
+## 4. Plan por fases ⚠️ parcial (Fases 1–3 + 6 ✅; Fase 4 parcial; Fase 5 parcial)
 
 ### Fase 1 — Grabación + logoaudiometría básica ✅ hecho (migraciones 012 + 013)
 - ✅ Schema `stimulus_lists` + `stimuli` (tokens con audio opcional, file_path, métricas RMS/peak/duración/sample_rate, normalized flag)
@@ -149,7 +149,7 @@ Objetivo: que los dB reportados sean dB SPL reales, no pseudo-calibrados.
 - ✅ Store global (`useCalibrationStore`) carga `setActiveCalibrationCurve` en boot y al activar otra calibración
 - ✅ UI `/calibracion`: crear set → agregar puntos por chip de freq + oído, matriz 6 × 2 con contador N/12
 
-### Fase 4 — Procesamiento avanzado + pruebas PAC verbales
+### Fase 4 — Procesamiento avanzado + pruebas PAC verbales ⚠️ parcial (SSW beta sin QA clínico)
 - ✅ **Denoise espectral** (`src/lib/audio/denoise.ts`). STFT radix-2 (N=1024, hop 256, Hann), perfil de ruido por percentil 20 de magnitud por bin (robusto sin silencio inicial limpio), gate por bin (bin > `noise * thrMul` → pasa; sino atenúa `reductionDb` = −12 dB default), smoothing en frecuencia y tiempo (half-width 2 bins / 2 frames) contra musical noise, iSTFT con overlap-add y normalización por ∑win². Integrado en `processClip` tras HP y antes de VAD. Flag `denoise: true` default en `ProcessingOptions`
 - ✅ **Trim automático robusto (VAD)**. `recording.ts` — ventana 10 ms hop 5 ms, RMS+ZCR, piso de ruido adaptativo (percentil 10 de energías), umbral = `noise_floor + 12 dB` (piso absoluto −50 dBFS), asistencia ZCR para fricativas (umbral adaptativo por percentil 70 de ZCR), cierre morfológico (huecos <80 ms rellenados) y apertura (islas <30 ms descartadas), márgenes pre 30 ms / post 50 ms. Fallback al método RMS fijo si VAD no detecta voz. Seleccionable por `trimMethod: 'vad'|'rms'` en `ProcessingOptions` (default `vad`)
 - ✅ **Repo `audiopac-assets` + página `/catalogos`**. Repo GitHub público con manifiesto `index.json` + catálogos JSON (texto+keywords) + GitHub Releases para packs audio tar.gz. App (`src/lib/assets/catalogs.ts` + `CatalogsPage.tsx`): fetch manifiesto, valida SHA-256, instala texto runtime (crea listas+items en DB, idempotente), descarga tarballs audio (con progress stream), gunzip via `fflate`, parse tar POSIX manual, decodifica+procesa+guarda cada WAV. Sharvard v1 publicado: texto (`catalogs/sharvard-es-v1.json`, 211 KB) + audio F (130 MB) + audio M (135 MB) como release `sharvard-audio-v1`. Filosofía: contenido fuera del binario — catálogos nuevos sin rebuild; contribuciones comunitarias vía PR al repo assets. Menu lateral nuevo ítem "Catálogos".
@@ -171,6 +171,8 @@ Objetivo: que los dB reportados sean dB SPL reales, no pseudo-calibrados.
 - ✅ Mezcla simultánea tono + ruido vía `ToneDefinition.noise_mix` (rama paralela en `playSequence`, misma envolvente de duración)
 - ✅ **MLD (Masking Level Difference)** (`MLD_STD`, mig 008). Inversión de fase R vía `phase_invert_right` (gain -1 en `rightNode` del tono; ruido nunca invertido). Tokens A=SoNo+tono, B=SoNo catch, C=SπNo+tono (−10 dB), D=SπNo catch
 - ✅ **Calibración SPL del ruido por tipo** (mig 002). Tabla `noise_calibration_points` (calibration_id × noise_type ∈ pink/white/ssn) con `ref_db_spl @ 0 dBFS`. Engine: `playCalibrationNoise(type, dbfs, ear)` para loop continuo + `resolveNoiseRefDb(type)` que usa medición real si existe, fallback heurístico (ref+RMS estimado) si no. `playStimulusWithNoise` y `playStimulusSequenceWithNoise` consumen el ref real. UI `/calibracion` sección 4: reproducir ruido al nivel interno, medir con sonómetro, guardar. Carga vía `useCalibrationStore` en boot.
+- ✅ **Ponderación del sonómetro A/C/Z** (mig 005). Columna `weighting` en `calibration_points` y `noise_calibration_points`. `src/lib/audio/weighting.ts` implementa tabla IEC 61672-1:2013 (filtros A y C) con interpolación log-frecuencia para tonos puros + offsets empíricos para ruido de banda ancha (pink/white/ssn). UI `/calibracion`: selector A/C/Z en bloques tono y ruido; al guardar se convierte la lectura a dB SPL lineal (Z) y se almacena tanto el valor Z como la ponderación original para auditoría. Tabla de puntos muestra badge con la ponderación usada. Motivación: los sonómetros clase 2 baratos (GM1352, UT353 básicos) suelen medir solo en dBA — antes obligaban al usuario a conocer el offset A→Z de memoria o aproximar. ⚠️ Limitaciones: (a) offsets para ruido son empíricos (no tabulados en IEC), precisión estimada ±2 dB vs. medición con sonómetro Z real; (b) para tono puro fuera de freqs tabuladas (10 Hz–20 kHz) se satura al extremo más cercano; (c) no cubre ponderación B (obsoleta en IEC 61672) ni perfiles personalizados de sonómetros específicos.
+- 📝 **Coupler DIY para sonómetro** — preparado pero oculto. Componente `src/components/CouplerSection.tsx` (card plegable con descarga de STL/3MF/STEP, guía de montaje, BOM) + carpeta `public/coupler/` lista para assets. Feature flag `SHOW_COUPLER_SECTION = false` en `src/routes/CalibrationPage.tsx`. Diseño propuesto: cavidad interna 6.00 cm³ ± 0.05 (NBS 9-A supraaural), carcasa SLA (resina) o FDM+epoxi, camisa externa con grout sin retracción (~500 g), O-ring nitrilo 50×3 mm para sello con el cojín auricular, orificio Ø 12.7 mm (½") para mic clase 2, peso estandarizado 500 g. Objetivo: repetibilidad intra-sujeto ±1–2 dB. **Pendiente**: diseño CAD del coupler (no se incluye — falta modelado paramétrico en FreeCAD/Fusion + validación empírica del volumen + guía fotográfica de montaje). ⚠️ Aclaración explícita: NO reemplaza acoplador ANSI S3.6 / IEC 60318 certificado; sigue siendo uso investigativo / screening. La ventaja es estar por encima del estándar de facto de apps móviles (Mimi, hearWHO) que corren sin calibración alguna.
 
 ---
 
@@ -195,6 +197,8 @@ Objetivo: que los dB reportados sean dB SPL reales, no pseudo-calibrados.
 | `pac-binaural-v1` | ILD_LAT, DICHOTIC_NV, FUSION_BIN | — | ninguno |
 | `pac-noise-v1` | GIN_STD, RGD_20/10/5, NBN_SCREEN | — | ninguno |
 | `pac-mld-v1` | MLD_STD | — | ninguno |
+| `pps-pinheiro-v1` | PPS_STD | — | ninguno |
+| `dps-musiek-v1` | DPS_STD | — | ninguno |
 | `logoaud-latam-v1` | SRT_LATAM_BISIL | SRT_LATAM_BISIL_A (20), DISC_LATAM_MONO_A (25) | recording |
 | `logoaud-us-es-v1` | SRT_US_ES_BISIL | SRT_US_ES_BISIL_A (20) | recording |
 | `dichotic-digits-es-v1` | DD_ES_FREE, DD_ES_DIRECTED | DICHOTIC_DIGITS_ES (8 dígitos) | recording |
@@ -204,6 +208,7 @@ Objetivo: que los dB reportados sean dB SPL reales, no pseudo-calibrados.
 | `palpa-es-v1` | — | PALPA_PARES_MIN_ES_A (40 palabras) | recording |
 | `matrix-es-v1` | MATRIX_ES | MATRIX_ES_A (50 palabras, 5 cols × 10) | recording |
 | `hint-es-clinico-v1` | HINT_SHARVARD_L01..L70 (70 tests) | (referencia `catalogs/sharvard-es-v1.json`) | audio_pack |
+| `ssw-es-v1` | SSW_ES_FORM_A | SSW_ES_FORM_A (160 hemispondees) | recording |
 
 **Pendiente:**
 
@@ -215,18 +220,18 @@ Objetivo: que los dB reportados sean dB SPL reales, no pseudo-calibrados.
 - ✅ 6.8 PPS_STD (Pinheiro 880/1430) y DPS_STD (Musiek, 60 secuencias) publicados como packs independientes `pps-pinheiro-v1` y `dps-musiek-v1` en el repo assets (alternativa más limpia que pac-patterns-v2 — cada test estándar histórico en su propio pack).
 - ✅ 6.9 Plantillas reporte custom por pack. Campo opcional `report_template_md` en `PackManifest` → almacenado dentro de `packs.metadata_json` (sin nueva migración). Placeholders soportados: `{{patient_name}}`, `{{patient_age}}`, `{{test_name}}`, `{{test_code}}`, `{{date}}`, `{{ear}}`, `{{examiner}}`, `{{accuracy_pct}}`, `{{correct}}`, `{{total}}`, `{{verdict}}`, `{{rt_mean_ms}}`, `{{rt_median_ms}}`, `{{asymmetry_pct}}`, `{{metric_value}}`, `{{norm_band}}`, `{{pack_name}}`, `{{pack_version}}`. `fillReportTemplate()` resuelve placeholders; faltantes → `—`. `<PackReportTemplateCard>` en `SessionReportPage` renderiza markdown narrativo. Ejemplo publicado en `pac-patterns-v1` v1.1.0.
 
-#### 6.X (propuesta original — para referencia)
+#### 6.X (propuesta original — para referencia) ✅ hecho (sustituido por 6.1–6.4 efectivos)
 
 Refactor filosófico: la app arranca **vacía** (solo motor, grabador, calibración). Tests, listas y audios vienen como **paquetes instalables/desinstalables** desde `audiopac-assets`. Migraciones = solo schema de BD; contenido = runtime.
 
-#### 6.1 Visión
+#### 6.1 Visión ✅ hecho
 
 App = motor audio + engine de pruebas. No viene con tests pre-cargados. Usuario puede:
 - Crear sus propios tests desde `/tests/nuevo` (capacidad ya existe)
 - Ir a `/catalogos` → instalar packs oficiales/comunitarios → tests aparecen en `/tests`
 - Desinstalar packs que no usa → tests desaparecen (con protección si hay sesiones que los referencian)
 
-#### 6.2 Formato paquete
+#### 6.2 Formato paquete ✅ hecho
 
 Cada pack es un JSON autocontenido (en repo assets) con:
 
@@ -260,7 +265,7 @@ Cada pack es un JSON autocontenido (en repo assets) con:
 }
 ```
 
-#### 6.3 Schema BD nuevo (mig chica, no breaking)
+#### 6.3 Schema BD nuevo (mig chica, no breaking) ✅ hecho
 
 - `packs` (`id`, `code UNIQUE`, `version`, `name`, `metadata_json`, `installed_at`, `source_url`)
 - `test_templates.pack_id` FK nullable → `packs(id)` ON DELETE SET NULL
@@ -268,7 +273,7 @@ Cada pack es un JSON autocontenido (en repo assets) con:
 
 Tests/lists con `pack_id = NULL` = creados por el usuario, intocables al desinstalar packs.
 
-#### 6.4 Ficha UI por pack en `/catalogos`
+#### 6.4 Ficha UI por pack en `/catalogos` ✅ hecho
 
 | Estado requirement | Icono + mensaje |
 |---|---|
@@ -278,7 +283,7 @@ Tests/lists con `pack_id = NULL` = creados por el usuario, intocables al desinst
 
 Ficha muestra: descripción, licencia, referencias, cantidad de tests/listas, tamaño audio (si aplica), botones Instalar/Desinstalar/Actualizar.
 
-#### 6.5 Plan por fases
+#### 6.5 Plan por fases ✅ hecho
 
 1. **6.1** Mig BD nueva: `packs` + FK en `test_templates`/`stimulus_lists`
 2. **6.2** Schema JSON pack definido + publicar pack ejemplo (`packs/pac-tonal-core-v1.json`)
@@ -290,7 +295,7 @@ Ficha muestra: descripción, licencia, referencias, cantidad de tests/listas, ta
 8. **6.8** Interpretación dinámica en `SessionReportPage`: leer `pack.interpretation.norms_by_age` → semáforo automático + referencias en footer
 9. **6.9** Plantillas de reporte custom por pack (markdown con placeholders tipo `{{srt_db}}`, `{{asimetría}}`)
 
-#### 6.6 Paquetes pendientes de crear (cuando el sistema esté listo)
+#### 6.6 Paquetes pendientes de crear (cuando el sistema esté listo) 📝 pendiente
 
 - ✅ **Matrix-ES** (Hochmuth 2012) publicado (`matrix-es-v1`). Estructura 5 columnas × 10 palabras. Nuevo runner `MatrixController` (`src/lib/audio/matrixRunner.ts`) con SNR bracketing 5-AFC por columna. UI `MatrixRun.tsx` con grid clickeable 5×10. Engine: `playStimulusSequenceWithNoise` concatena N buffers con gap inter-palabra y ruido continuo. Metadata `column` (0-4) por stimulus asigna a qué columna pertenece. Audios HörTech cerrados → pack solo trae estructura; usuario graba sus 50 palabras.
 - **SSW adaptado** — ver §7 (plan completo con corpus, motor `playSSWItem`, runner, editor, informe y pack)
@@ -298,7 +303,7 @@ Ficha muestra: descripción, licencia, referencias, cantidad de tests/listas, ta
 - ✅ **PALPA-E** publicado (`palpa-es-v1`); PAL listas LatAm cubiertas por `logoaud-latam-v1`
 - ✅ **HINT-ES clínico v2** publicado (`hint-es-clinico-v1`). 70 tests `HINT_SHARVARD_L01..L70` predefinidos apuntando a las listas Sharvard (generado por `scripts/build-hint-es-clinico-pack.mjs`). A diferencia de `sharvard-es-v1` (sólo L01 como template a clonar), este pack expone cada lista como test seleccionable directamente desde `/tests`. `requirements: audio_pack` — requiere catálogo Sharvard ES + pack audio instalados.
 
-#### 6.7 Riesgos y mitigaciones
+#### 6.7 Riesgos y mitigaciones ✅ hecho
 
 - **Sesiones huérfanas al desinstalar**: FK `ON DELETE SET NULL` + UI bloquea desinstalar si hay `test_sessions.template_id` apuntando (ofrece "archivar pack" en lugar de borrar)
 - **Offline bootstrap**: primer arranque sin red → app funcional pero vacía; cachear último `index.json` para mostrar "ya conocés estos packs aunque no podés instalarlos ahora"
@@ -336,7 +341,7 @@ Ejemplo EN clásico: R="SUN-up", L="dayLIGHT" → `"SUN"`[RNC] + (`"up"` ∥ `"d
 
 El protocolo alterna **ear-first** (R-first / L-first) mitad y mitad para medir efectos de orden. Presentación ~50 dB HL sobre SRT. Requiere SRT previo o asumido.
 
-### 7.1 Corpus ES (160 hemispondees)
+### 7.1 Corpus ES (160 hemispondees) ✅ hecho
 
 **Estrategia**: armar 40 pares spondee donde cada mitad (hemispondee) sea palabra ES autónoma bisílaba acentuada en primera sílaba (tensionada), con solape semántico-acústico suficiente para evocar el spondee compuesto.
 
@@ -349,7 +354,7 @@ Pool candidato:
 
 **Listas**: `SSW_ES_FORM_A` (40 pares) + opcional `SSW_ES_FORM_B` retest. 160 grabaciones por forma.
 
-### 7.2 Schema — stimuli + metadata
+### 7.2 Schema — stimuli + metadata ✅ hecho
 
 Reutilizar `stimuli.metadata_json` para marcar rol:
 
@@ -366,7 +371,7 @@ Nueva categoría: `StimulusCategory = 'ssw'` (agregar al CHECK de `001_initial.s
 
 160 grabaciones = 40 × 2 lados × 2 posiciones. Cada una con metadata completo.
 
-### 7.3 Motor — `playSSWItem`
+### 7.3 Motor — `playSSWItem` ✅ hecho
 
 Nueva función en `src/lib/audio/engine.ts`:
 
@@ -398,7 +403,7 @@ Retornar `finished` Promise que resuelve tras `dur(RNC)+dur(RC|LC)+dur(LNC)`.
 
 **No crear** runner adaptativo: SSW no adapta nivel, es 40 ítems a nivel fijo.
 
-### 7.4 Tipos + plantilla
+### 7.4 Tipos + plantilla ✅ hecho
 
 `src/types/index.ts`:
 
@@ -430,7 +435,7 @@ interface TestConfig {
 
 `TestType` se extiende con `'SSW'` (pack trae `test_type: 'SSW'`).
 
-### 7.5 Runner — `SSWController`
+### 7.5 Runner — `SSWController` ✅ hecho
 
 `src/lib/audio/sswRunner.ts`:
 
@@ -477,7 +482,7 @@ Persistencia por trial en `responses`:
 - `given_pattern`: `"RNC:buen|RC:dia|LC:so|LNC:rey"`
 - `is_correct`: `1` si las 4 correctas, `0` sino (uso informativo; scoring real por condición).
 
-### 7.6 Scoring clínico — `SSWScore`
+### 7.6 Scoring clínico — `SSWScore` ✅ hecho
 
 ```ts
 interface SSWScore {
@@ -504,7 +509,7 @@ Tabla de norms por edad (Katz 1998, ajuste estándar):
 
 Poblar en `pack.interpretation.norms_by_age`.
 
-### 7.7 Editor — `SSWConfigEditor`
+### 7.7 Editor — `SSWConfigEditor` ✅ hecho
 
 `src/components/editors/SSWConfigEditor.tsx`. Layout 2-cols (como SRT/Matrix):
 
@@ -526,7 +531,7 @@ Usar el mismo patrón `SharedConfigSection` + `AdvancedJsonEditor`.
 
 Helper `updateStimulusMetadata` ya existe (se agregó para Matrix) — reusar.
 
-### 7.8 UI de ejecución — `SSWRun.tsx`
+### 7.8 UI de ejecución — `SSWRun.tsx` ✅ hecho
 
 Pantalla por trial:
 
@@ -554,7 +559,7 @@ Trial 12/40      ear-first: R     nivel: 50 dB HL
 
 Modal pre-start con consigna (de `patient_instructions_md`). Modal post-sesión con puntuación cruda y link al informe.
 
-### 7.9 Informe — card SSW en `SessionReportPage`
+### 7.9 Informe — card SSW en `SessionReportPage` ✅ hecho
 
 Nueva tarjeta `<SSWReportCard score={SSWScore} age={patient.age} />`:
 
@@ -570,7 +575,7 @@ Nueva tarjeta `<SSWReportCard score={SSWScore} age={patient.age} />`:
 
 Extender `TestScore` union para SSW y `test_sessions.test_score` tipado con `SSWScore`. Ya existe patrón similar (SRT/HINT/Matrix) — replicar.
 
-### 7.10 Pack `ssw-es-v1`
+### 7.10 Pack `ssw-es-v1` ✅ hecho
 
 `audiopac-assets/packs/ssw-es-v1.json`:
 
@@ -634,7 +639,7 @@ Extender `TestScore` union para SSW y `test_sessions.test_score` tipado con `SSW
 }
 ```
 
-### 7.11 Migración / DB
+### 7.11 Migración / DB ✅ hecho
 
 - **Migración 002 aditiva**: `ALTER TABLE stimulus_lists` no necesario; agregar `'ssw'` al CHECK de `stimuli_lists.category` mediante recreación (SQLite no soporta ALTER CHECK). Alternativa: usar `'custom'` y filtrar en UI por metadata → más limpio evitar migración.
 - `TestType` en app: agregar `'SSW'` al union (`src/types/index.ts`).
@@ -642,7 +647,7 @@ Extender `TestScore` union para SSW y `test_sessions.test_score` tipado con `SSW
 
 **Decisión sugerida**: usar `category = 'ssw'` con migración aditiva porque facilita filtrado y el UX del editor. Migración mínima (recrea tabla preservando filas).
 
-### 7.12 Plan de fases
+### 7.12 Plan de fases ⚠️ parcial (QA clínico con sujetos pendiente)
 
 1. **7.12.1 Corpus** — armar y validar 40 pares ES. Publicar como `ssw-es-v1` texto-only (sin audio; requirements:'recording'). Balance fonémico validado con `PhonemeBalanceChart`.
 2. **7.12.2 Schema + tipos** — `SSWParams`, `TestConfig.ssw`, `TestType: 'SSW'`, migración 002 con `category='ssw'`.
@@ -655,7 +660,7 @@ Extender `TestScore` union para SSW y `test_sessions.test_score` tipado con `SSW
 9. **7.12.9 Pack** — publicar `ssw-es-v1` en `audiopac-assets` con ficha clínica completa (purpose/how/protocol/target/contraindic + refs Katz/Brunt/Musiek).
 10. **7.12.10 QA clínico** — validar con 5 sujetos normales y 5 con TPAC conocido; comparar contra norms. Ajustar corte normativo si difiere significativamente de Katz US-EN.
 
-### 7.13 Riesgos y decisiones abiertas
+### 7.13 Riesgos y decisiones abiertas 📝 pendiente (decidir catch trials response-bias)
 
 - **Validación ES**: Katz 1998 norma sobre corpus EN. Cualquier adaptación ES inherentemente carece de validación publicada — pack se presenta como **investigativo**, no diagnóstico. Badge "uso investigativo" en banner del test.
 - **Solape acústico**: si hemispondees tienen durations muy distintas, RC y LC no alinean bien. Normalizar durations a rango 450–550 ms post-grabación (warning en editor si sale de ese rango).
@@ -681,7 +686,7 @@ Habilitó 9 plantillas PAC nuevas (mig 005 + 006).
 
 Objetivo: unificar búsqueda/filtrado en páginas con listas acumulativas. Inspirado en flujo "nuevo reporte" de OtoReport (combobox paciente con creación inline).
 
-### 8.1 Componentes reusables nuevos
+### 8.1 Componentes reusables nuevos ✅ hecho
 
 - ✅ `src/components/ui/SearchBar.tsx` — input con icono `Search`, botón clear, debounce opcional. Reemplaza el patrón ad-hoc que sólo tenía `PatientsPage`.
 - ✅ `src/components/ui/FilterChips.tsx` — chips togglables con etiqueta y conteo por opción. Activo = primario, inactivo = outline. Genérico sobre `T extends string`.
@@ -689,7 +694,7 @@ Objetivo: unificar búsqueda/filtrado en páginas con listas acumulativas. Inspi
 - ✅ `src/components/TestCombobox.tsx` — igual patrón que PatientCombobox pero para `TestTemplateParsed`. Busca por nombre/código/descripción/tipo. Muestra badge `test_type` + código monoespaciado.
 - ✅ `PatientForm` — extendido con prop `defaults?: Partial<Patient>` para prefill sin gatillar modo edit. `onSaved(id?)` devuelve id recién creado.
 
-### 8.2 Páginas migradas
+### 8.2 Páginas migradas ✅ hecho
 
 | Página | Antes | Después |
 |---|---|---|
@@ -699,7 +704,7 @@ Objetivo: unificar búsqueda/filtrado en páginas con listas acumulativas. Inspi
 | `PacksSection` (en `/catalogos`) | Grid sin filtros | `SearchBar` (nombre/id/categoría) + `FilterChips` estado (instalados/disponibles/updates) + requirements (ninguno/recording/audio_pack) |
 | `StimuliPage` | Select país + lista sin filtro | Mantiene selector país + agrega `SearchBar` lista (nombre/código/descripción) + `FilterChips` categoría con conteos |
 
-### 8.3 Dinámica de creación inline (patrón OtoReport)
+### 8.3 Dinámica de creación inline (patrón OtoReport) ✅ hecho
 
 Antes el flujo "nueva evaluación sin paciente pre-existente" requería: `/evaluacion` → "ah no está" → ir a `/pacientes` → "nuevo paciente" → llenar → volver a `/evaluacion` → buscar en select → continuar. Ahora: se tipea el nombre en el combobox, el dropdown ofrece "crear con este nombre", modal inline, al guardar queda seleccionado automáticamente y el flujo sigue. Cero navegación lateral.
 
@@ -746,6 +751,7 @@ Redactar `purpose_md` / `how_it_works_md` / `protocol_md` / `target_population_m
 | `hint-es-clinico-v1` | 70 | ✅ v1.2.0 (ficha clínica por lista: purpose/how/protocol/target/contraindic + refs Aubanel/Nilsson/Soli-Wong/Hall en cada uno de los 70 tests) |
 | `pps-pinheiro-v1` | 1 | ✅ v1.1.0 (PPS estándar 880/1430 Hz con refs Pinheiro/Musiek) |
 | `dps-musiek-v1` | 1 | ✅ v1.1.0 (DPS estándar 500/250 ms con refs Musiek-Baran-Pinheiro/Bellis) |
+| `ssw-es-v1` | 1 | ⚠️ v1.0.0-beta (SSW Forma A 40 ítems, badge investigativo, refs Katz 1962/1998 + Brunt) |
 
 **Otros pendientes UX:**
 
@@ -753,7 +759,7 @@ Redactar `purpose_md` / `how_it_works_md` / `protocol_md` / `target_population_m
 - Persistir preferencia de vista/orden en `settings` (hoy reset al recargar; selección de test sí persiste via URL).
 - Stats "último uso" / "frecuencia" (requieren JOIN con `test_sessions`).
 
-#### 8.5.1 Diseño original (referencia)
+#### 8.5.1 Diseño original (referencia) ✅ hecho
 
 **Organización jerárquica (carpetas/familias)**
 - Agrupar visualmente por **pack de origen** (`packs.name`) o por **familia funcional** (PAC patrones / PAC temporal / PAC binaural / PAC ruido / Logoaudiometría / Dichotic / HINT / Matrix / Custom).
@@ -813,7 +819,7 @@ Es un refactor medio-grande: UI + schema pack + backfill de contenido clínico (
 4. Redactar contenido clínico pack por pack y re-publicar en `audiopac-assets`.
 5. Referencias cruzadas (sugerir tests relacionados por familia).
 
-### 8.6 Editores por motor
+### 8.6 Editores por motor ✅ hecho (v1 todos los motores; 8.6.6 knobs avanzados pendiente)
 
 **Estado actual (MVP v2):** SRT, Dichotic Digits, HINT/SinB y Matrix 5-AFC tienen editores nativos. Los 5 motores cubiertos.
 
@@ -889,7 +895,7 @@ Es un refactor medio-grande: UI + schema pack + backfill de contenido clínico (
 
 `<TokenInfoDialog>` reusa `analyze()` para modal de detalle por palabra: división silábica con tónica resaltada, badges (sílabas, acentuación, tilde, diptongo, hiato), grids Consonantes/Vocales con letras en cajitas color, audio info si grabado, issues.
 
-#### 8.6.6 Personalización real — knobs clínicos por motor (pendiente)
+#### 8.6.6 Personalización real — knobs clínicos por motor ⚠️ parcial (SRT/Dichotic v2 + escape hatch JSON hechos; resto motores pendientes)
 
 El estado actual de los editores expone los params canónicos de cada runner, pero **no basta para personalizar protocolos clínicos**. Un investigador que quiere replicar un paper o armar su propio protocolo necesita knobs que hoy están hardcoded o ausentes. La ruta elegida es **A — expandir schemas**: agregar los knobs a los tipos + runner + UI.
 
@@ -1033,6 +1039,65 @@ Prioridad (ruta C mixta ya definida en §8.6.6 — primero expandir schemas, esc
   - Matrix (`MatrixConfigEditor`): chart global + `MatrixPerColumnStats` (longitud min-max, iniciales distintas por columna).
 - ✅ **Preview TTS** en `TokenInfoDialog`: dropdown de locale (ES-ES/ES-MX/ES-US/ES-AR + detección de voces instaladas via `getVoices()`), botón "Pronunciar" con `speechSynthesis` rate 0.9. Locale persistido en `localStorage` (`audiopac.tts.locale`). Disclaimer: preview sintético, no reemplaza la grabación.
 
+### 8.7 Visor del roadmap in-app ✅ hecho
+
+Exponer `docs/ROADMAP_PAC.md` dentro de la app como sección navegable `/roadmap`, con índice clicable y badges de estado por sección/ítem.
+
+**Objetivo:** el clínico/dev ve de un vistazo qué funciones existen, qué está en curso y qué falta, sin salir de la app ni abrir el repo.
+
+**Implementado (`src/lib/roadmapParser.ts` + `src/routes/RoadmapPage.tsx`):** parser con slugs NFD + numeración de duplicados, detección de status por emoji en heading/bullets, conteos recursivos por sección. Layout 2 columnas: sidebar sticky (320px) con barra de progreso global, buscador, filter chips (Todo / Hecho / Pendiente / En curso / Parcial / Bloqueado), TOC colapsable h2/h3/h4 con icono de status + conteo `done/total`, heading activo resaltado vía `IntersectionObserver`. Main con headings `id={slug}` + `scroll-mt-24`, botón copiar-enlace por heading, enlaces internos `#slug` navegan sin recargar. URL query `?filter=en-curso|hecho|…` sincronizada. Command Palette (`Ctrl+K`) indexa headings del roadmap y navega al anchor. Carga build-time vía `?raw` (Vite).
+
+#### 8.7.1 Extensiones al parser `src/lib/markdown.tsx` ✅ hecho (parser propio en `src/lib/roadmapParser.ts`)
+
+- **Heading anchors**: emitir `<h2 id="slug">` / `<h3 id="slug">` automáticamente. Slugify: lowercase, remover tildes (NFD), `-` por espacios/puntuación, numerar duplicados (`ssw-2`).
+- **Estado por emoji**: detectar símbolo al inicio del heading o del primer bullet hijo y exponerlo como `data-status` en el nodo. Vocabulario fijo:
+  - ✅ hecho · 🚧 en curso · 📝 pendiente · ⚠️ parcial / con caveat · ❌ bloqueado
+- **Task list GFM** (`- [ ]` / `- [x]`): render como checkbox deshabilitado, o convertir a ✅/📝 para unificar con el resto.
+- **Conteo por sección**: al parsear, devolver árbol `{ id, title, status, children[], counts: { done, pending, partial, blocked } }`.
+
+#### 8.7.2 Normalización previa del MD ⚠️ parcial (parser tolera convenciones mixtas; falta pasada de normalización del MD fuente)
+
+El MD actual mezcla convenciones (`✅ hecho`, `- ✅`, `⚠️ Pendiente`, `📝 plan`, tablas con otra convención). Pasada única de normalización:
+
+- Heading: `## N. Título [STATUS]` donde STATUS ∈ {✅, 🚧, 📝, ⚠️, ❌}. Si no lleva, se deriva del contenido.
+- Bullet con estado al inicio: `- ✅ ...` / `- 📝 ...`. Evitar `✅ hecho` redundante.
+- Convención fija documentada al inicio del MD (leyenda).
+
+#### 8.7.3 Carga del MD ✅ hecho (vía `?raw` Vite)
+
+- Build-time: `import roadmapMd from '../../docs/ROADMAP_PAC.md?raw'` (Vite). Bundleado, sin fetch runtime.
+- Hot reload en dev gracias a Vite watcher.
+- Si el doc crece mucho: lazy-import la ruta `/roadmap` para no penalizar el bundle inicial.
+
+#### 8.7.4 Componente `<RoadmapViewer>` + ruta `/roadmap` ✅ hecho
+
+**Layout 2 columnas** (sticky sidebar + contenido scrollable):
+
+- **Sidebar izquierdo (320 px)**: TOC auto del AST.
+  - Cada nodo muestra: icono estado · título · conteo hijos pendientes (`§11 · 3/14 📝`).
+  - Click → `scrollIntoView({block:'start', behavior:'smooth'})` al anchor.
+  - Heading activo en viewport se resalta (IntersectionObserver).
+  - Plegable por nivel (h2 siempre visible, h3 colapsable).
+- **Panel derecho**: MD renderizado con `Markdown` existente, anchors ya emitidos.
+- **Header**:
+  - Barra de progreso global con conteo: "Completado 72 % (148 / 206 ítems)".
+  - `SearchBar` filtra headings por texto (NFD, case-insensitive).
+  - `FilterChips`: Todo / Hecho / Pendiente / En curso / Con caveat. Oculta o atenúa secciones según filtro.
+- **Enlaces cruzados**: URLs internas `#11.1.3` navegan dentro del visor sin recargar.
+- **Enlace externo**: botón "Ver en GitHub" (repo del proyecto) y "Copiar enlace a esta sección".
+
+#### 8.7.5 Entrypoints ⚠️ parcial (menú + Ctrl+K hechos; footer "N en curso" pendiente)
+
+- Item en menú lateral (`AppLayout`): "Roadmap" con badge de ítems nuevos desde última visita (opcional).
+- Atajo `Ctrl+K` (Spotlight) busca headings del roadmap y navega a la sección.
+- Footer "Hay N funciones en curso" que linkea a `/roadmap?filter=en-curso`.
+
+#### 8.7.6 Fuera de alcance (para más adelante) 📝 pendiente (no priorizado)
+
+- Edición del MD desde la app (requiere flujo git sync — no prioridad).
+- Subscripción a cambios (changelog automático al hacer `git pull`).
+- Votación comunitaria de items pendientes.
+
 ---
 
 ## 9. Vista previa de motores e informe ✅ hecho
@@ -1060,3 +1125,384 @@ Cada test muestra ahora el **sustrato neurofisiológico** que respalda la prueba
 - ✅ **Index regenerado** (`assets/index.json`): sha256 y bytes recomputados para los 18 packs editados.
 
 Acción usuario: reinstalar / re-sync packs para que los nuevos campos aparezcan en la ficha clínica.
+
+---
+
+## 11. Validez regional + debilidades sistémicas (hardening) 📝 pendiente
+
+**Filosofía:** audiopac entrega herramienta y opciones técnicas perfectas; la **validación lingüística/clínica regional** es responsabilidad de la comunidad (centros, tesistas, clínicos). Nuestro deber es no ocultar las limitaciones ni forzar un único corpus como "verdad".
+
+### 11.1 Validez regional del corpus (bloqueador clínico real) 📝 pendiente
+
+**Problema:** Sharvard y HINT-ES están construidos sobre español peninsular (ES-ES). Un paciente chileno, mexicano o rioplatense usando ese corpus infla errores por:
+
+- **/s/ coda aspirada/elidida** en ES-CL/AR (`casas` → [ka.sah]/[ka.sa]) — rompe balance consonántico Sharvard
+- **Seseo** (ES-LA entero no distingue /s/-/θ/) — `casa`/`caza` homófonos
+- **Yeísmo rehilado** (ES-AR /ʝ/→[ʒ/ʃ]) — afecta discriminación
+- **Léxico divergente**: `coche/auto/carro`, `ordenador/computador/computadora`, `zumo/jugo`, `móvil/celular`, `vale/dale`
+- **Prosodia ritmo silábico**: CL elonga final distinto → rompe timing HINT adaptativo
+- **Frecuencias léxicas**: CREA-España ≠ Subtlex-LA ≠ habla coloquial CL
+
+**Implicancia:** falso positivo TPAC por desconocimiento lexical/fonológico, no déficit auditivo central.
+
+#### 11.1.1 Schema pack — provisión flexible + región 📝 pendiente
+
+Deprecar `requirements` excluyente. Nuevo:
+
+```ts
+interface PackManifest {
+  requirements?: 'ninguno' | 'recording' | 'audio_pack'  // mantener backcompat
+  provides_audio?: boolean             // pack trae audios descargables
+  supports_recording?: boolean         // usuario puede grabar (primera vez u override)
+  recording_overrides_audio?: boolean  // grabación del usuario pisa audio del pack
+  region_validated?: string[]          // ['ES-ES'] / ['ES-CL','ES-MX'] / ['*']
+  regional_caveats_md?: string         // narrativa de limitaciones regionales
+}
+```
+
+Installer deriva `requirements` viejo si faltan los nuevos campos.
+
+#### 11.1.2 Coexistencia audio del pack + grabación propia 📝 pendiente
+
+Flujo objetivo (ej. Sharvard en CL): instalás pack → audio ES-ES disponible + warning región → usás tal cual **o** regrabás frases en voz CL-neutra → tu versión regionalizada sin tocar el pack original.
+
+- `stimuli.metadata_json.is_user_override = true` cuando el usuario regraba un token que tenía audio del pack
+- Botón "Regrabar" con confirm "¿sobrescribir audio del pack?"
+- Botón "Restaurar audio del pack" si hay override → re-extrae del pack fuente
+- Filtro `/estimulos`: "Mostrar solo overrides", "Mostrar solo sin grabar"
+
+#### 11.1.3 Badges UI + warning mismatch 📝 pendiente
+
+- Ficha pack (`PackDetailDialog` + `PacksSection`): 3 badges independientes 📦 audio · 🎤 grabable · 🌎 región
+- Ficha test (`TestDetailPanel`): banner ámbar si `settings.country_code` no está en `region_validated` del pack, con link a `regional_caveats_md`
+
+#### 11.1.4 Diccionario léxico regional 📝 pendiente
+
+Archivo estático `src/lib/es/regional-lexicon.json`:
+
+```jsonc
+{
+  "coche": { "region": "ES-ES", "alt": { "ES-CL":"auto", "ES-MX":"carro", "ES-AR":"auto" } },
+  "zumo":  { "region": "ES-ES", "alt": { "*":"jugo" } },
+  "ordenador": { "region":"ES-ES", "alt": { "*":"computador" } }
+}
+```
+
+Semilla 100–200 entradas; crece por PR al repo app o al repo assets. Consumido por:
+
+- `SentenceAnalysisPanel` (§11.2) — flag palabras no-regionales con sugerencia de reemplazo
+- Matrix editor — warning si una columna mezcla léxico regional
+- SRT editor — warning si la lista base (imprimible/grabable) tiene palabras fuera del país configurado
+
+#### 11.1.5 Re-publicar packs existentes con metadata regional 📝 pendiente
+
+| Pack | `region_validated` | Caveat |
+|---|---|---|
+| `sharvard-es-v1` | `['ES-ES']` | "Corpus peninsular. Uso en LA puede inflar errores léxicos." |
+| `hint-es-clinico-v1` | `['ES-ES']` | Idem |
+| `hint-es-v1` | `['*']` (vacío, usuario graba) | "Usuario regraba en variedad propia." |
+| `logoaud-latam-v1` | `['ES-MX','ES-CL','ES-AR','ES-CO','ES-PE','ES-UY',...]` | Listas neutras LatAm |
+| `logoaud-us-es-v1` | `['ES-US']` | Español US con influencia MX |
+| `palpa-es-v1` | `['ES-ES']` inicial | Pares mínimos peninsular; portear a CL/MX pendiente |
+| `dichotic-digits-es-v1` | `['*']` | Dígitos — variación mínima entre regiones |
+| `matrix-es-v1`, `sinb-es-v1`, `ssw-es-v1` | `['*']` (usuario graba) | Estructura sola |
+| `pac-*` | `['*']` | Tonos puros, sin léxico |
+
+### 11.2 Editor de frases HINT/Sharvard — subirlo al nivel del de SRT 📝 pendiente
+
+**Estado hoy:** `HINTConfigEditor` usa `PhonemeBalanceChart` en `mode='sentence'` que sólo tokeniza palabras y reporta chi² global. El editor de SRT (palabras) tiene análisis mucho más rico (sílabas, pares mínimos, sugerencias, TTS, chi² normalizado).
+
+**Gap:** frases son más complejas que palabras — tienen ritmo, predictibilidad cloze, tipo sintáctico, keywords vs no-keywords. El editor actual ignora todo eso.
+
+#### 11.2.1 Nuevo componente `SentenceAnalysisPanel` 📝 pendiente
+
+Reemplaza el chart actual en `HINTConfigEditor` (y futuros editores de frases).
+
+**Por frase (modal al click):**
+- Palabras totales, sílabas totales, sílabas tónicas, ritmo estimado
+- Keywords marcadas / totales (target HINT = 3–5 keywords/frase)
+- Predictibilidad (cloze) estimado por frecuencia léxica Subtlex-ES regional — alta predictibilidad rompe el paradigma HINT (paciente "adivina")
+- Flag léxico regional: resalta palabras fuera de `country_code` con sugerencia
+- Tipo sintáctico (afirmativa/negativa/interrogativa/imperativa)
+- Análisis fonético agregado de keywords (reusa `analyze()` de SRT)
+- TTS preview de la frase completa
+
+**Global del corpus:**
+- Chi² fonémico sobre keywords (no sobre todas las palabras — keywords son lo puntuable)
+- Histograma longitud palabras/frase (target HINT = 5–7)
+- Histograma sílabas totales/frase (target Sharvard = 6–8)
+- Balance tipo sintáctico
+- Pares mínimos entre keywords de frases distintas (confusión potencial)
+- Score regional: % palabras en diccionario del país vs "exóticas"
+- Score predictibilidad global (media cloze)
+
+#### 11.2.2 Integración en otros editores 📝 pendiente
+
+- **Matrix editor**: flag regional por palabra de columna usando el mismo diccionario
+- **Dichotic editor**: warning si tokens mezclan pronunciación regional (raro en dígitos, pero marcable)
+- **SSW editor**: ya usa grid; agregar flag regional por hemispondee
+
+### 11.3 Otras debilidades detectadas (auditoría) 📝 pendiente
+
+#### 11.3.1 Calibración — curva por frecuencia existe pero infrautilizada ⚠️ parcial
+
+- UI permite calibrar 12 puntos (6 freq × 2 oídos), pero la mayoría calibra sólo 1 kHz y el resto se extrapola. Debería haber **wizard guiado** que fuerce al menos 250/500/1k/2k/4k/8k.
+- Calibración ruido SSN/pink/white: si no se midió, usa heurística fallback que puede desviar 3–6 dB reales. Marcar en informe "ruido no calibrado directamente" cuando aplica.
+- Sin lectura de volumen OS nativo: `PreSessionCheck` detecta cambios groseros pero no previene drift fino. Evaluar plugin Tauri nativo para leer sink por OS.
+
+#### 11.3.2 Procesamiento de grabaciones — /s/ aspirada CL 📝 pendiente
+
+- VAD + trim por RMS puede recortar fricativas débiles (/s/ final CL aspirada, /f/ post-VC). El piso adaptativo +12 dB es conservador pero bajo SNR de grabación doméstica falla.
+- Normalización RMS −20 dBFS fijo no respeta relación vocal/fricativa. Considerar normalización LUFS o por-segmento (vocal-tónica).
+- Denoise espectral asume ruido estacionario; ruido de sala con tráfico/HVAC lo rompe. Añadir modo "denoise off por lote" obvio.
+
+#### 11.3.3 Corpus Matrix — no hay guía de balance Hochmuth 📝 pendiente
+
+- Hochmuth 2012 arma el grid optimizando por **matriz de confusiones fonéticas** (Markov): palabras dentro de una columna deben ser equiconfundibles acústicamente.
+- Nuestro editor deja al usuario armar las 50 palabras a ojo. Falta:
+  - Sugerencia automática de candidatos por columna usando análisis fonético
+  - Detector de "outliers" (palabra que no encaja en la columna por feature acústica)
+  - Check de longitud uniforme por columna (Hochmuth exige duraciones parejas)
+
+#### 11.3.4 SSW — corpus beta sin garantía duraciones ⚠️ parcial (QA pendiente)
+
+- 40 spondee beta pseudo-compuestos. Editor ya alerta si hemispondee fuera de 450–650 ms, pero no **fuerza** re-grabación.
+- Falta: batch "normalizar durations" que aplique time-stretch leve (PSOLA/WSOLA) para empujar hemispondees al target sin regrabar. WASM (soundtouch-js) o sidecar.
+- QA clínico (§7.12.10) — pendiente real con sujetos.
+
+#### 11.3.5 Normas clínicas — todas importadas EN/PEN 📝 pendiente
+
+- 108 tests con `norms_by_age` de Katz/Musiek/Nilsson/Hochmuth/Pinheiro/Moore/Plomp/Hirsh… todos sobre población EN o PEN.
+- Ninguna norma validada en ES-LA publicada en el pack. Debería haber:
+  - Campo `norms_by_region` en `pack.interpretation` (paralelo a `norms_by_age`)
+  - UI en informe: elegir qué normativa aplicar si hay múltiples
+  - Advertencia "normativa no validada en tu región" si sólo hay EN
+
+#### 11.3.6 Catálogos y assets — dependencia GitHub sin fallback 📝 pendiente
+
+- `fetchPacksIndex` pega a `raw.githubusercontent.com`. Si cae o el usuario está offline, no hay catálogo.
+- Falta: cachear último `index.json` + `packs/*.json` en `appDataDir/assets-cache/` y mostrar "última sincronización: hace X días" cuando offline.
+- Export/import de packs locales (archivo `.audiopac-pack.json` manual) para escenarios sin internet.
+
+#### 11.3.7 Pacientes — historia clínica mínima 📝 pendiente
+
+- Hoy sólo nombre + documento + fecha nacimiento + sexo. Falta:
+  - Antecedentes (otitis recurrentes, TEC, exposición ruido, dislexia, TDAH)
+  - Audiometría tonal previa (umbrales por frecuencia) — crítica para SRT y SSW
+  - Historia PAC previa (referencia a sesiones pasadas)
+  - Campo de diagnóstico presuntivo derivante
+- Schema nuevo: tabla `patient_history` con JSON flexible.
+
+#### 11.3.8 Informe — sin PDF, sin export 📝 pendiente
+
+- `SessionReportPage` renderiza HTML. No hay export PDF, Word, ni impresión limpia.
+- Falta: botón "Exportar PDF" (print-friendly CSS + `window.print()` o sidecar nativo wkhtmltopdf).
+- Compartir informe por link firmado / QR / email — fuera de alcance corto.
+
+#### 11.3.9 Backup / restore DB 📝 pendiente
+
+- Sin mecanismo oficial. Si el usuario pierde `audiopac.db` pierde todo.
+- Falta: botón "Exportar respaldo" (zip con DB + `stimuli/` + packs metadata) + "Importar respaldo" que valida integridad.
+- Autobackup semanal a carpeta configurable.
+
+#### 11.3.10 Auditoría — sin log de cambios 📝 pendiente
+
+- Editar un template, borrar un pack, regrabar un audio — todo sin historial. Un informe emitido el mes pasado puede haber sido calculado con un template que luego cambió.
+- Snapshots de template y calibración ya se guardan en `test_sessions` — bien. Pero ediciones del template vivo no tienen historial.
+- Falta: tabla `audit_log` con (timestamp, entity, entity_id, action, diff_json, user).
+
+#### 11.3.11 Pediátrico — UI adulta en interfaz 📝 pendiente
+
+- Runners muestran texto + botones. Un niño de 7 años necesita feedback visual (caritas, animaciones) y consignas en imagen.
+- `PatientInstructionsModal` permite markdown pero sin multimedia pediátrica.
+- Falta: `feedback.visual = 'adult' | 'pediatric_emoji' | 'pediatric_animation'` en `TestConfig`.
+- Gamificación ligera (puntaje visible, refuerzos) como knob opcional.
+
+#### 11.3.12 Ruido ambiental de cabina 📝 pendiente
+
+- La app asume ambiente silencioso; no verifica. Recording doméstico puede tener 40–50 dB SPL ambiente.
+- Feature propuesto: pre-check "1 s de silencio grabado" → si RMS > −40 dBFS warning "ambiente ruidoso, resultados pueden no ser válidos".
+
+#### 11.3.13 Multi-evaluador / autenticación 📝 pendiente
+
+- Hay campo `examiner` en sesiones pero sin login. Cualquier usuario de la PC ve todo.
+- Sin prioridad alta para uso individual; necesario para instituciones (multi-fonoaudiólogo, hospital).
+
+#### 11.3.14 Screening batería agregada 📝 pendiente
+
+- No existe flujo "correr tests A+B+C al paciente en orden" con informe consolidado.
+- Cada test es sesión separada. Falta `test_batteries` (código de batería + orden de templates) + informe batería.
+
+### 11.4 Prioridades propuestas
+
+| Prio | Área | Razón |
+|---|---|---|
+| **P1** | 11.1 schema regional + badges + caveats | Bloqueador clínico — inflate falsos positivos en LA hoy |
+| **P1** | 11.2 editor frases rico | Hoy no se puede armar lista HINT decente sin salir a otras tools |
+| **P2** | 11.1.2 coexistencia audio+grabación | Habilita que Sharvard sea útil regionalizado |
+| **P2** | 11.3.8 export PDF informe | Feature pedido por uso clínico real |
+| **P2** | 11.3.9 backup/restore DB | Riesgo pérdida datos |
+| **P2** | 11.3.7 historia clínica extendida + audiometría tonal previa | Prerequisito para SRT/SSW correctos |
+| **P3** | 11.3.1 wizard calibración multi-freq | Mejora precisión; hoy funciona pero subóptimo |
+| **P3** | 11.3.5 `norms_by_region` en packs | Cuando haya datos regionales publicados |
+| **P3** | 11.3.6 cache offline assets | Útil pero workaround existe (manual) |
+| **P4** | 11.3.11 UI pediátrica, 11.3.14 batería, 11.3.13 auth, 11.3.10 audit | Features largos, no bloqueantes |
+
+---
+
+## 12. UX — brechas detectadas (pendientes) 📝 pendiente
+
+### 12.1 Eliminación robusta de listas custom de estímulos 📝 pendiente
+
+**Estado:** `StimuliPage.removeList` existe pero bloquea sólo `is_standard=1`. Faltan casos:
+
+- **Listas provenientes de pack** (`pack_id != NULL`, `is_standard=0`): borrables hoy, pero rompen la integridad del pack instalado. Al reinstalar o actualizar el pack, reaparecen. Debería:
+  - Bloquear delete directo; ofrecer "Desinstalar pack completo" desde la lista.
+  - O marcar lista como "oculta" sin borrar (`hidden=1` en metadata) para no perder referencias.
+- **Listas referenciadas por `test_templates` activos**: hoy borra y deja al template apuntando a un código inexistente. Debería:
+  - Detectar FK-like (query `test_templates` por `config.*.stimulus_list_code`) y bloquear con mensaje "usada por N tests: …".
+  - Ofrecer re-asignar o borrar tests dependientes en el mismo flujo.
+- **Listas con sesiones históricas** (`test_sessions.template_id` cuyo config referencia la lista): borrar puede invalidar informes reproducibles. Debería:
+  - Snapshot del contenido de la lista dentro de `test_sessions.stimuli_snapshot` (JSON) al iniciar sesión (similar a `calibration_curve_snapshot`).
+  - Así borrar la lista no afecta informes antiguos.
+- **Borrado en batch**: no existe selección múltiple. Usuario con 20 listas custom debe confirmar 20 veces.
+- **Borrado de tokens en batch**: mismo problema a nivel ítem.
+- **Archivos huérfanos**: si `removeStimulusFile` falla silencioso, quedan WAVs en `appDataDir/stimuli/` sin referencia. Falta job de limpieza ("Liberar espacio" en settings).
+
+Plan mínimo:
+1. Snapshot de lista en sesión (preserva informes)
+2. Detección de dependencias pre-delete (tests + sesiones en curso)
+3. Confirm modal rico: "Esta lista la usan X tests y Y sesiones activas. ¿Qué hacés?"
+4. Selección múltiple con checkbox + "Eliminar seleccionadas"
+5. Job `cleanupOrphanStimuli()` manual + settings "último mantenimiento"
+
+### 12.2 Vista previa del estilo de informe por motor 📝 pendiente
+
+**Estado:** runners tienen modo `preview` (§9) que recorre la UI del test con datos simulados, pero **no existe vista previa del informe final** antes de correr el test. Hoy para saber cómo se verá el informe de SSW hay que: crear paciente → correr 40 trials → llegar al informe.
+
+**Objetivo:** botón "Vista previa del informe" en `TestDetailPanel` (y en el editor de test) que abre una pantalla idéntica a `SessionReportPage` pero con datos **mock** generados por motor.
+
+#### 12.2.1 Fixtures mock por motor 📝 pendiente
+
+`src/lib/preview/reportFixtures.ts`:
+
+```ts
+export function mockScoreForEngine(engine: Engine): TestScore {
+  switch (engine) {
+    case 'srt':     return { srt_db: 25, trials: [...mockSRT], ... }
+    case 'hint':    return { srt_snr_db: -3.2, trials: [...], ... }
+    case 'matrix':  return { srt_snr_db: -7.1, per_column: [...], ... }
+    case 'dichotic':return { accuracy_pct: 84, asymmetry_pct: 8, ... }
+    case 'ssw':     return mockSSWScore() // con 4 condiciones pobladas
+    case 'patterns':return { accuracy_pct: 76, rt_median_ms: 820, ... }
+  }
+}
+```
+
+Valores mock pensados para que:
+- Caigan en banda "leve" de la normativa del pack (para mostrar semáforo amarillo, no verde ni rojo)
+- Ejerciten todos los placeholders de `report_template_md` (keywords, asimetrías, efectos)
+- Muestren todas las secciones del informe (narrativa, normativa, tabla por condición, grafos)
+
+#### 12.2.2 Pantalla `/tests/:id/preview-informe` 📝 pendiente
+
+- Reusa `SessionReportPage` con flag `previewMode`
+- Banner ámbar "Vista previa — datos simulados, no es un informe real"
+- Paciente mock: "Paciente Ejemplo, 35 años, fecha ejemplo"
+- Calibración mock: curva plana 85 dB SPL @ 0 dBFS
+- Sin escribir en DB
+
+#### 12.2.3 Entrypoints UI 📝 pendiente
+
+- `TestDetailPanel`: botón "👁 Vista previa del informe" junto a "Iniciar evaluación"
+- `TestEditorPage`: botón igual — ver en vivo cómo queda el informe mientras se editan knobs (ej. cambiar `num_items` de SSW y ver cómo se refleja)
+- `PackDetailDialog`: un botón por test dentro del pack
+- `SessionReportPage` en preview acepta `?engine=ssw&pack=ssw-es-v1` para linkear directo
+
+#### 12.2.4 Caso de uso 📝 pendiente
+
+- Clínico evalúa si un pack le sirve antes de instalarlo (ficha pack → preview informe → decidir)
+- Desarrollador de pack itera `report_template_md` + `norms_by_age` con feedback visual inmediato
+- Investigador muestra a colegas el output esperado sin necesidad de correr el test
+- Marketing / documentación: screenshots del informe para README del pack
+
+### 12.3 Otras brechas UX menores (para completar lista) 📝 pendiente
+
+- **Duplicar test/lista**: botón "Duplicar" desde ficha abre editor con `name+' (copia)'` y código auto-incrementado. Hoy hay que copiar config a mano.
+- **Importar/exportar lista como CSV/JSON**: para intercambio entre instalaciones o versionado fuera de packs.
+- **Historial de cambios por template**: ver diff entre ediciones (relacionado 11.3.10).
+- **Favoritos / pinned tests**: marcar los más usados, aparecen arriba en `/tests` y en combobox de `/evaluacion`.
+- **Búsqueda global dentro del informe** (`Ctrl+F` nativo cubre texto plano, pero no busca en tablas/normas colapsadas).
+- **Modo comparativo de informes**: seleccionar 2 sesiones del mismo paciente/test y ver lado-a-lado (pre/post tratamiento).
+- **Atajos de teclado documentados**: hoy `Ctrl+K`, `1-4` en SSW, `R/L` en catch — no hay cheatsheet accesible (`?` debería abrirlo).
+
+### 12.4 Builder avanzado de listas por motor (desde StimuliPage) 📝 pendiente
+
+**Problema**: `StimuliPage` (`/estudio`) es una vista simplificada muy buena para **grabar/normalizar** (mic, trim, RMS, batch record), pero la forma de **agregar tokens** es un input plano + botón "Agregar". No usa ninguna de las herramientas ricas que ya existen dentro de los `*ConfigEditor` de cada motor (análisis fonético SRT, balance HINT, slots SSW, columnas Matrix, pares fijos Dichotic). Resultado: el clínico crea listas "ciegas" desde Estudio y las listas salen pobres comparadas con las del editor del motor.
+
+**Objetivo**: mantener `/estudio` como vista simple de grabación, pero cuando el usuario quiere **agregar/editar tokens** de una lista con categoría reconocida, lanzarlo a una **vista avanzada por motor** que reutilice las herramientas de análisis de los ConfigEditor.
+
+#### 12.4.1 UX propuesta 📝 pendiente
+
+- En el panel derecho de `StimuliPage`, junto al título de la lista seleccionada, botón **"Editor avanzado"** (o icono `Wand2`).
+- El input inline "Nuevo token" + botón "Agregar" se **reemplaza** (para categorías con motor) por un botón grande **"Crear / editar tokens en editor avanzado"** que navega a `/listas/:id/editor`.
+- Ruta nueva `/listas/:id/editor`:
+  - Header con nombre de la lista + botón "← Volver a Estudio"
+  - Contenido: componente específico por `category` de la lista
+  - Persistencia: los cambios se guardan vía los mismos endpoints de `@/lib/db/stimuli` que usa Estudio hoy (sin migración DB, sin tabla nueva)
+- Para categoría `custom`: sigue usando el input simple inline (no hay motor que analizar). No se ofrece editor avanzado.
+- Para listas estándar (`is_standard === 1`, p.ej. Sharvard): botón deshabilitado con tooltip "lista estándar inmutable — duplicá para editar".
+
+#### 12.4.2 Extracción de componentes reutilizables 📝 pendiente
+
+Hoy la lógica "builder de lista" vive **embebida dentro** de cada `*ConfigEditor.tsx` (mezclada con los knobs del test: SNR, nivel, ruido, etc.). Hay que **extraer** la parte pura de gestión de lista a un componente reusable que acepte `listId` + `items` y dispare callbacks de CRUD:
+
+| Motor | Componente extraído | Capacidades (ya existen en el ConfigEditor, solo hay que desacoplar) |
+|---|---|---|
+| **SRT** | `SRTListBuilder` | Tokens bisílabos, análisis fonético en vivo (chi², pares mínimos, sugerencias cross-engine, TTS) — commit `861103a` |
+| **HINT / Sharvard** | `SentenceListBuilder` | Frases + keywords por frase + balance fonémico + longitud. Sharvard en modo read-only sobre catálogo |
+| **Matrix** | `MatrixListBuilder` | Tokens + metadata `column` (1–5) + autoassign + vista por columna + balance Hochmuth |
+| **SSW** | `SSWListBuilder` | Tokens con metadata `ssw_item`/`side`/`position` (slots RNC/RC/LC/LNC) + autoassign + verificación 4 slots por ítem |
+| **DichoticDigits** | `DichoticListBuilder` | Pares fijos L/R + random fill + validación dígitos_por_oído |
+| **Discrimination** | (fase 2) | Podría reutilizar `SRTListBuilder` con configuración ligera |
+
+**Principio**: **una sola fuente de verdad**. El mismo `*ListBuilder` se usa:
+- En `/listas/:id/editor` (flujo Estudio → avanzado)
+- Dentro de los `*ConfigEditor` existentes (flujo Test → editor), vía `InlineListCreator` u otro wrapper
+
+Cuando se crea una lista desde el editor de un motor, internamente se llama al mismo builder. Elimina el drift entre ambos flujos.
+
+#### 12.4.3 Reutilización del análisis de SRT 📝 pendiente
+
+El análisis fonético de SRT (chi² de fonemas, detección de pares mínimos, sugerencias de tokens complementarios, TTS rápido para preview) es el más rico y **es reutilizable total o parcialmente** para:
+
+- **HINT / Sharvard**: analizar balance fonémico **por frase** y **por lista completa** (ya parcialmente hecho en `§11.2.1 SentenceAnalysisPanel`)
+- **Matrix**: chi² por columna (cada columna tiene su propio inventario cerrado; verificar balance intra-columna)
+- **Discrimination**: idéntico a SRT
+- **SSW**: no aplica directamente (items dicóticos, no fonémicos), pero sí verificación de duración y RMS por slot
+
+Extraer a `@/lib/phonetics/analysis.ts` funciones puras que reciben `tokens: string[]` + opciones y devuelven métricas. Cada ListBuilder decide qué paneles mostrar.
+
+#### 12.4.4 Flujo creación de lista con motor 📝 pendiente
+
+Hoy: crear lista en Estudio → usuario queda en vista simple con input plano.
+
+Propuesto (opcional, decidir): al crear lista con categoría ≠ `custom`, **redirigir automáticamente** a `/listas/:id/editor` (mismo patrón que commit `1262bb1` hace con tests de motor único). El usuario puede volver a `/estudio` cuando quiera grabar.
+
+#### 12.4.5 Orden de implementación sugerido 📝 pendiente
+
+1. Extraer `SRTListBuilder` (el más complejo — si sale, los otros son subset).
+2. Montar ruta `/listas/:id/editor` + router por categoría.
+3. Wire up botón "Editor avanzado" en `StimuliPage`.
+4. Extraer `SentenceListBuilder` (reusa gran parte de `§11.2.1`).
+5. Extraer `MatrixListBuilder`, `SSWListBuilder`, `DichoticListBuilder`.
+6. Refactor: hacer que los `*ConfigEditor` usen los mismos builders extraídos (elimina código duplicado).
+7. (Opcional) Redirect automático post-creación para categorías con motor.
+
+#### 12.4.6 Fuera de alcance 📝 pendiente
+
+- **Custom**: no hay motor → sin análisis. Queda con input simple.
+- **Sharvard**: catálogo inmutable. Solo visualización, no edición.
+- **Listas sin categoría válida**: fallback a builder custom.
+
+
