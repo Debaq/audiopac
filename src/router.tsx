@@ -7,6 +7,7 @@ import { PatientsPage } from '@/routes/PatientsPage'
 import { PatientDetailPage } from '@/routes/PatientDetailPage'
 import { EvaluationHomePage } from '@/routes/EvaluationHomePage'
 import { EvaluationRunPage } from '@/routes/EvaluationRunPage'
+import { PreviewRunPage } from '@/routes/PreviewRunPage'
 import { TestsPage } from '@/routes/TestsPage'
 import { TestEditorPage } from '@/routes/TestEditorPage'
 import { ReportsPage } from '@/routes/ReportsPage'
@@ -29,6 +30,7 @@ export const router = createBrowserRouter([
           { path: '/pacientes/:id', element: <PatientDetailPage /> },
           { path: '/evaluacion', element: <EvaluationHomePage /> },
           { path: '/evaluacion/:sessionId', element: <EvaluationRunPage /> },
+          { path: '/preview/:templateId', element: <PreviewRunPage /> },
           { path: '/tests', element: <TestsPage /> },
           { path: '/tests/nuevo', element: <TestEditorPage /> },
           { path: '/tests/:id', element: <TestEditorPage /> },

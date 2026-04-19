@@ -13,6 +13,7 @@ import { ensureRunning, playStimulusBuffer, loadStimulusBuffer, type CalibCurveP
 import { loadStimulusWav } from '@/lib/fs/stimuli'
 import { useKeyboard, Kbd } from '@/hooks/useKeyboard'
 import { PatientInstructionsModal } from '@/components/PatientInstructionsModal'
+import { PreviewBanner } from '@/components/PreviewBanner'
 import type { TestSession, TestTemplateParsed, Patient, SRTParams, Stimulus } from '@/types'
 import { cn } from '@/lib/utils'
 
@@ -21,9 +22,10 @@ interface Props {
   template: TestTemplateParsed
   patient: Patient
   params: SRTParams
+  preview?: boolean
 }
 
-export function SRTRun({ session, template, patient, params }: Props) {
+export function SRTRun({ session, template, patient, params, preview = false }: Props) {
   const navigate = useNavigate()
   const sid = session.id
 
@@ -51,19 +53,23 @@ export function SRTRun({ session, template, patient, params }: Props) {
       const list = await getStimulusListByCode(params.stimulus_list_code)
       if (!list) { setLoadError(`Lista no encontrada: ${params.stimulus_list_code}`); return }
       const items = await listStimuli(list.id)
-      const withAudio = items.filter(s => s.file_path)
-      if (withAudio.length < params.words_per_level) {
-        setLoadError(`Lista "${list.name}" tiene solo ${withAudio.length} estímulos grabados. Se requieren al menos ${params.words_per_level}.`)
+      const usable = preview ? items : items.filter(s => s.file_path)
+      if (!preview && usable.length < params.words_per_level) {
+        setLoadError(`Lista "${list.name}" tiene solo ${usable.length} estímulos grabados. Se requieren al menos ${params.words_per_level}.`)
+        return
+      }
+      if (preview && usable.length === 0) {
+        setLoadError(`Lista "${list.name}" está vacía.`)
         return
       }
       let curve: CalibCurvePoint[] | undefined
       if (session.calibration_curve_snapshot) {
         try { curve = JSON.parse(session.calibration_curve_snapshot) } catch { curve = undefined }
       }
-      const ctrl = new SRTController(params, withAudio, session.ear, session.ref_db_snapshot ?? undefined, curve)
+      const ctrl = new SRTController(params, usable, session.ear, session.ref_db_snapshot ?? undefined, curve, preview)
       ctrlRef.current = ctrl
-      stimRef.current = withAudio
-      const prev = await listResponses(sid)
+      stimRef.current = usable
+      const prev = preview ? [] : await listResponses(sid)
       if (prev.length > 0) {
         ctrl.hydrate(prev.map(r => ({
           item_index: r.item_index,
@@ -135,15 +141,17 @@ export function SRTRun({ session, template, patient, params }: Props) {
       setFlash(correct ? 'correct' : 'incorrect')
       setTimeout(() => setFlash(null), 350)
     }
-    await saveResponse({
-      session_id: sid,
-      item_index: trial.index,
-      phase: 'test',
-      expected_pattern: `L${trial.level_db}|${trial.token}`,
-      given_pattern: correct ? trial.token : '',
-      is_correct: correct,
-      reaction_time_ms: trial.presented_at ? Date.now() - trial.presented_at : null,
-    })
+    if (!preview) {
+      await saveResponse({
+        session_id: sid,
+        item_index: trial.index,
+        phase: 'test',
+        expected_pattern: `L${trial.level_db}|${trial.token}`,
+        given_pattern: correct ? trial.token : '',
+        is_correct: correct,
+        reaction_time_ms: trial.presented_at ? Date.now() - trial.presented_at : null,
+      })
+    }
   }
 
   const playFamiliarization = async () => {
@@ -177,6 +185,7 @@ export function SRTRun({ session, template, patient, params }: Props) {
   const handleSkipFamiliarization = () => setPhase('test')
 
   const handleCancel = async () => {
+    if (preview) { navigate(`/tests?id=${template.id}`); return }
     if (!confirm('¿Cancelar evaluación?')) return
     await cancelSession(sid)
     navigate('/evaluacion')
@@ -191,6 +200,7 @@ export function SRTRun({ session, template, patient, params }: Props) {
   const handleSave = async () => {
     const ctrl = ctrlRef.current
     if (!ctrl) return
+    if (preview) { navigate(`/tests?id=${template.id}`); return }
     setFinishing(true)
     try {
       const totalScored = ctrl.state.trials.filter(t => t.correct !== undefined).length
@@ -255,6 +265,7 @@ export function SRTRun({ session, template, patient, params }: Props) {
       flash === 'incorrect' && 'bg-red-50 dark:bg-red-950/20'
     )}>
       <div className="p-8 max-w-5xl mx-auto">
+        {preview && <PreviewBanner />}
         <div className="flex items-start justify-between mb-6">
           <div>
             <h1 className="text-3xl font-black tracking-tight">{template.name}</h1>
@@ -405,7 +416,7 @@ export function SRTRun({ session, template, patient, params }: Props) {
               <Label>Observaciones</Label>
               <Textarea value={notes} onChange={e => setNotes(e.target.value)} rows={4} placeholder="Observaciones clínicas, comportamiento, etc." />
               <Button size="lg" className="w-full mt-4" onClick={handleSave} disabled={finishing}>
-                {finishing ? 'Guardando...' : 'Finalizar y generar informe'}
+                {preview ? 'Cerrar vista previa' : finishing ? 'Guardando...' : 'Finalizar y generar informe'}
               </Button>
             </CardContent>
           </Card>

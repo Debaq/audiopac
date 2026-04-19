@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import {
   Play, Package, Edit2, Trash2, BookOpen, Target, Stethoscope,
   Users, AlertTriangle, Clock, ExternalLink, FileText, Video, Link as LinkIcon,
-  Mic, Download,
+  Mic, Download, Eye,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -15,7 +15,7 @@ import type { PackRequirements } from '@/lib/packs/types'
 import type { TestConfig, TestTemplateParsed } from '@/types'
 
 type EngineKey = 'patterns' | 'srt' | 'dichotic' | 'hint' | 'matrix'
-const ENGINES_WITH_EDITOR: ReadonlySet<EngineKey> = new Set(['patterns', 'srt', 'dichotic'])
+const ENGINES_WITH_EDITOR: ReadonlySet<EngineKey> = new Set(['patterns', 'srt', 'dichotic', 'hint', 'matrix'])
 function detectEngine(cfg: TestConfig): EngineKey {
   if (cfg.srt) return 'srt'
   if (cfg.dichotic_digits) return 'dichotic'
@@ -122,6 +122,11 @@ export function TestDetailPanel({
                 <Button size="sm"><Play className="w-4 h-4" /> Iniciar evaluación</Button>
               </Link>
             )}
+            <Link to={`/preview/${template.id}`}>
+              <Button size="sm" variant="outline" title="Recorrer la UI del motor y el informe sin paciente ni audios">
+                <Eye className="w-4 h-4" /> Vista previa
+              </Button>
+            </Link>
             {(() => {
               const engine = detectEngine(template.config)
               const hasEditor = ENGINES_WITH_EDITOR.has(engine)

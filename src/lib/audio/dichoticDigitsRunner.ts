@@ -1,6 +1,7 @@
 import type { DichoticDigitsParams, Stimulus } from '@/types'
 import { loadStimulusBuffer, playStimulusPair, playStimulusBuffer, type CalibCurvePoint, resolveRefDb } from './engine'
 import { loadStimulusWav } from '@/lib/fs/stimuli'
+import { PREVIEW_PLAY_MS } from '@/lib/preview/mockSession'
 
 /**
  * Un par dicótico. Si `digits_per_ear > 1`, `left_tokens`/`right_tokens` tienen
@@ -55,6 +56,7 @@ export class DichoticDigitsController {
   private refDb?: number
   private bufferCache: Map<number, AudioBuffer> = new Map()
   private stopHandle: (() => void) | null = null
+  private preview: boolean
 
   state: DichoticState
   private listeners = new Set<(s: DichoticState) => void>()
@@ -63,10 +65,12 @@ export class DichoticDigitsController {
     params: DichoticDigitsParams,
     stimuli: Stimulus[],
     refDb?: number,
-    curve?: CalibCurvePoint[]
+    curve?: CalibCurvePoint[],
+    preview = false,
   ) {
     this.params = params
-    this.stimuli = stimuli.filter(s => s.file_path)
+    this.preview = preview
+    this.stimuli = preview ? stimuli : stimuli.filter(s => s.file_path)
     this.refDb = refDb
     this.curve = curve
     this.state = {
@@ -245,6 +249,13 @@ export class DichoticDigitsController {
     this.state.isPlaying = true
     pair.presented_at = Date.now()
     this.emit()
+
+    if (this.preview) {
+      await new Promise(r => setTimeout(r, PREVIEW_PLAY_MS))
+      this.state.isPlaying = false
+      this.emit()
+      return
+    }
 
     try {
       const refBin = this.refDb ?? resolveRefDb(1000, 'binaural', this.curve)

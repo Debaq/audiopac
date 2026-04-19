@@ -10,6 +10,7 @@ import { finishSession, cancelSession, saveResponse, listResponses } from '@/lib
 import { getStimulusListByCode, listStimuli } from '@/lib/db/stimuli'
 import { MatrixController, type MatrixState } from '@/lib/audio/matrixRunner'
 import { ensureRunning, type CalibCurvePoint } from '@/lib/audio/engine'
+import { PreviewBanner } from '@/components/PreviewBanner'
 import type { TestSession, TestTemplateParsed, Patient, MatrixParams } from '@/types'
 import { cn } from '@/lib/utils'
 
@@ -18,11 +19,12 @@ interface Props {
   template: TestTemplateParsed
   patient: Patient
   params: MatrixParams
+  preview?: boolean
 }
 
 const COLUMN_LABELS = ['Nombre', 'Verbo', 'Número', 'Objeto', 'Adjetivo']
 
-export function MatrixRun({ session, template, patient, params }: Props) {
+export function MatrixRun({ session, template, patient, params, preview = false }: Props) {
   const navigate = useNavigate()
   const sid = session.id
 
@@ -43,15 +45,20 @@ export function MatrixRun({ session, template, patient, params }: Props) {
       if (session.calibration_curve_snapshot) {
         try { curve = JSON.parse(session.calibration_curve_snapshot) } catch { /* noop */ }
       }
-      const ctrl = new MatrixController(params, items, session.ear, session.ref_db_snapshot ?? undefined, curve)
-      if (!ctrl.columnsReady()) {
+      const ctrl = new MatrixController(params, items, session.ear, session.ref_db_snapshot ?? undefined, curve, preview)
+      if (!preview && !ctrl.columnsReady()) {
         const miss = ctrl.missingColumns()
         setLoadError(`Faltan grabaciones en columna(s) ${miss.map(i => COLUMN_LABELS[i] ?? i).join(', ')}. Revisá /estimulos — cada palabra necesita metadata.column asignado.`)
         return
       }
+      if (preview && !ctrl.columnsReady()) {
+        const miss = ctrl.missingColumns()
+        setLoadError(`Lista sin metadata.column en columna(s): ${miss.map(i => COLUMN_LABELS[i] ?? i).join(', ')}. Asigná metadata para preview.`)
+        return
+      }
       ctrlRef.current = ctrl
       setColumnTokens(Array.from({ length: params.columns }, (_, i) => ctrl.columnTokens(i)))
-      const prev = await listResponses(sid)
+      const prev = preview ? [] : await listResponses(sid)
       if (prev.length > 0) {
         ctrl.hydrate(prev.map(r => ({
           item_index: r.item_index,
@@ -107,19 +114,22 @@ export function MatrixRun({ session, template, patient, params }: Props) {
     const t = c.pendingTrial()
     if (!t) return
     c.answer(selected)
-    await saveResponse({
-      session_id: sid,
-      item_index: t.index,
-      phase: 'test',
-      expected_pattern: `S${t.snr_db}|${t.expected.join('|')}`,
-      given_pattern: selected.map(s => s ?? '').join('|'),
-      is_correct: ((t.correct_count ?? 0) / t.expected.length) >= params.threshold_pass_ratio,
-      reaction_time_ms: t.presented_at ? Date.now() - t.presented_at : null,
-    })
+    if (!preview) {
+      await saveResponse({
+        session_id: sid,
+        item_index: t.index,
+        phase: 'test',
+        expected_pattern: `S${t.snr_db}|${t.expected.join('|')}`,
+        given_pattern: selected.map(s => s ?? '').join('|'),
+        is_correct: ((t.correct_count ?? 0) / t.expected.length) >= params.threshold_pass_ratio,
+        reaction_time_ms: t.presented_at ? Date.now() - t.presented_at : null,
+      })
+    }
     setSelected(Array(params.columns).fill(null))
   }
 
   const handleCancel = async () => {
+    if (preview) { navigate(`/tests?id=${template.id}`); return }
     if (!confirm('¿Cancelar evaluación?')) return
     await cancelSession(sid)
     navigate('/evaluacion')
@@ -134,6 +144,7 @@ export function MatrixRun({ session, template, patient, params }: Props) {
   const handleSave = async () => {
     const c = ctrlRef.current
     if (!c) return
+    if (preview) { navigate(`/tests?id=${template.id}`); return }
     setFinishing(true)
     try {
       const scored = c.state.trials.filter(t => t.pass !== undefined)
@@ -183,6 +194,7 @@ export function MatrixRun({ session, template, patient, params }: Props) {
   return (
     <div className="min-h-screen">
       <div className="p-8 max-w-6xl mx-auto">
+        {preview && <PreviewBanner />}
         <div className="flex items-start justify-between mb-6">
           <div>
             <h1 className="text-3xl font-black tracking-tight">{template.name}</h1>
@@ -324,7 +336,7 @@ export function MatrixRun({ session, template, patient, params }: Props) {
               <Label>Observaciones</Label>
               <Textarea value={notes} onChange={e => setNotes(e.target.value)} rows={4} placeholder="Observaciones clínicas, comportamiento, etc." />
               <Button size="lg" className="w-full mt-4" onClick={handleSave} disabled={finishing}>
-                {finishing ? 'Guardando...' : 'Finalizar y generar informe'}
+                {preview ? 'Cerrar vista previa' : finishing ? 'Guardando...' : 'Finalizar y generar informe'}
               </Button>
             </CardContent>
           </Card>

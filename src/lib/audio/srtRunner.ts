@@ -1,6 +1,7 @@
 import type { SRTParams, Stimulus, Ear } from '@/types'
 import { loadStimulusBuffer, playStimulusBuffer, playStimulusWithCarrierAndMasking, type CalibCurvePoint, resolveRefDb } from './engine'
 import { loadStimulusWav } from '@/lib/fs/stimuli'
+import { PREVIEW_PLAY_MS } from '@/lib/preview/mockSession'
 
 export interface SRTTrial {
   index: number
@@ -56,6 +57,7 @@ export class SRTController {
   private refDb?: number
   private bufferCache: BufferCache = new Map()
   private stopHandle: (() => void) | null = null
+  private preview: boolean
 
   private usedIdsGlobal = new Set<number>()
 
@@ -67,10 +69,12 @@ export class SRTController {
     stimuli: Stimulus[],
     ear: Ear,
     refDb?: number,
-    curve?: CalibCurvePoint[]
+    curve?: CalibCurvePoint[],
+    preview = false,
   ) {
     this.params = params
-    this.stimuli = stimuli.filter(s => s.file_path)
+    this.preview = preview
+    this.stimuli = preview ? stimuli : stimuli.filter(s => s.file_path)
     this.ear = ear
     this.refDb = refDb
     this.curve = curve
@@ -210,6 +214,15 @@ export class SRTController {
     if (this.state.isPlaying) return
     const stim = this.stimuli.find(s => s.id === trial.stimulus_id)
     if (!stim) return
+    if (this.preview || !stim.file_path) {
+      this.state.isPlaying = true
+      trial.presented_at = Date.now()
+      this.emit()
+      await new Promise(r => setTimeout(r, PREVIEW_PLAY_MS))
+      this.state.isPlaying = false
+      this.emit()
+      return
+    }
     const buf = await this.getBuffer(stim)
     this.state.isPlaying = true
     trial.presented_at = Date.now()

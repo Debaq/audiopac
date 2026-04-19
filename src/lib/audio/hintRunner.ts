@@ -2,6 +2,7 @@ import type { HINTParams, Stimulus, Ear } from '@/types'
 import { loadStimulusBuffer, playStimulusWithNoise, type CalibCurvePoint, resolveRefDb } from './engine'
 import { loadStimulusWav } from '@/lib/fs/stimuli'
 import { parseKeywords } from '@/lib/db/stimuli'
+import { PREVIEW_PLAY_MS } from '@/lib/preview/mockSession'
 
 export interface HINTTrial {
   index: number
@@ -59,6 +60,7 @@ export class HINTController {
   private refDb?: number
   private bufferCache = new Map<number, AudioBuffer>()
   private stopHandle: (() => void) | null = null
+  private preview: boolean
   private usedIdsGlobal = new Set<number>()
 
   state: HINTState
@@ -69,10 +71,14 @@ export class HINTController {
     stimuli: Stimulus[],
     ear: Ear,
     refDb?: number,
-    curve?: CalibCurvePoint[]
+    curve?: CalibCurvePoint[],
+    preview = false,
   ) {
     this.params = params
-    this.stimuli = stimuli.filter(s => s.file_path && parseKeywords(s).length > 0)
+    this.preview = preview
+    this.stimuli = preview
+      ? stimuli.filter(s => parseKeywords(s).length > 0 || s.token.split(/\s+/).length > 0)
+      : stimuli.filter(s => s.file_path && parseKeywords(s).length > 0)
     this.ear = ear
     this.refDb = refDb
     this.curve = curve
@@ -112,7 +118,7 @@ export class HINTController {
       const token = match[2]
       const stim = this.stimuli.find(s => s.token === token)
       if (!stim) continue
-      const keywords = parseKeywords(stim)
+      const keywords = this.keywordsFor(stim)
       // given_pattern: CSV de keys correctas (o vacío)
       const correctKeys = r.given_pattern ? r.given_pattern.split('|').filter(Boolean) : []
       const pass = r.is_correct === null ? undefined : !!r.is_correct
@@ -154,6 +160,16 @@ export class HINTController {
       }
     }
     this.state.levelStats = Array.from(stats.values()).sort((a, b) => b.snr_db - a.snr_db)
+  }
+
+  private keywordsFor(s: Stimulus): string[] {
+    const k = parseKeywords(s)
+    if (k.length > 0) return k
+    if (!this.preview) return []
+    return s.token
+      .split(/\s+/)
+      .map(w => w.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '').replace(/[^\p{L}\p{N}]+/gu, ''))
+      .filter(w => w.length > 0)
   }
 
   private async getBuffer(s: Stimulus): Promise<AudioBuffer> {
@@ -200,7 +216,7 @@ export class HINTController {
       snr_db: this.state.currentSnr,
       stimulus_id: stim.id,
       token: stim.token,
-      keywords: parseKeywords(stim),
+      keywords: this.keywordsFor(stim),
     }
     this.state.trials.push(trial)
     this.emit()
@@ -211,6 +227,15 @@ export class HINTController {
     if (this.state.isPlaying) return
     const stim = this.stimuli.find(s => s.id === trial.stimulus_id)
     if (!stim) return
+    if (this.preview || !stim.file_path) {
+      this.state.isPlaying = true
+      trial.presented_at = Date.now()
+      this.emit()
+      await new Promise(r => setTimeout(r, PREVIEW_PLAY_MS))
+      this.state.isPlaying = false
+      this.emit()
+      return
+    }
     const buf = await this.getBuffer(stim)
     const noiseLevel = this.params.noise_level_db
     const voiceLevel = noiseLevel + trial.snr_db

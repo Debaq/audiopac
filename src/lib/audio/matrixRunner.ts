@@ -2,6 +2,7 @@ import type { MatrixParams, Stimulus, Ear } from '@/types'
 import { loadStimulusBuffer, playStimulusSequenceWithNoise, type CalibCurvePoint, resolveRefDb } from './engine'
 import { loadStimulusWav } from '@/lib/fs/stimuli'
 import { parseStimMetadata } from '@/lib/db/stimuli'
+import { PREVIEW_PLAY_MS } from '@/lib/preview/mockSession'
 
 export interface MatrixTrial {
   index: number
@@ -48,10 +49,10 @@ function pickRandom<T>(arr: T[]): T {
 }
 
 /** Agrupa estímulos grabados por columna (metadata.column 0..columns-1). */
-export function groupByColumn(stimuli: Stimulus[], columns: number): Stimulus[][] {
+export function groupByColumn(stimuli: Stimulus[], columns: number, includeUnrecorded = false): Stimulus[][] {
   const cols: Stimulus[][] = Array.from({ length: columns }, () => [])
   for (const s of stimuli) {
-    if (!s.file_path) continue
+    if (!includeUnrecorded && !s.file_path) continue
     const meta = parseStimMetadata(s)
     const c = typeof meta.column === 'number' ? meta.column : -1
     if (c >= 0 && c < columns) cols[c].push(s)
@@ -67,6 +68,7 @@ export class MatrixController {
   private refDb?: number
   private bufferCache = new Map<number, AudioBuffer>()
   private stopHandle: (() => void) | null = null
+  private preview: boolean
 
   state: MatrixState
   private listeners = new Set<(s: MatrixState) => void>()
@@ -77,9 +79,11 @@ export class MatrixController {
     ear: Ear,
     refDb?: number,
     curve?: CalibCurvePoint[],
+    preview = false,
   ) {
     this.params = params
-    this.columns = groupByColumn(stimuli, params.columns)
+    this.preview = preview
+    this.columns = groupByColumn(stimuli, params.columns, preview)
     this.ear = ear
     this.refDb = refDb
     this.curve = curve
@@ -214,6 +218,15 @@ export class MatrixController {
       const s = this.columns[i]?.find(x => x.id === trial.stim_ids[i])
       if (!s) return
       stims.push(s)
+    }
+    if (this.preview || stims.some(s => !s.file_path)) {
+      this.state.isPlaying = true
+      trial.presented_at = Date.now()
+      this.emit()
+      await new Promise(r => setTimeout(r, PREVIEW_PLAY_MS))
+      this.state.isPlaying = false
+      this.emit()
+      return
     }
     const buffers = await Promise.all(stims.map(s => this.getBuffer(s)))
     const noiseLevel = this.params.noise_level_db
