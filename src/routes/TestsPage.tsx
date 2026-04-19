@@ -48,7 +48,7 @@ function cmp(sort: SortKey): (a: TestTemplateParsed, b: TestTemplateParsed) => n
 
 type EngineKey = 'patterns' | 'srt' | 'dichotic' | 'hint' | 'matrix'
 
-const ENGINES_WITH_EDITOR: ReadonlySet<EngineKey> = new Set(['patterns', 'srt', 'dichotic'])
+const ENGINES_WITH_EDITOR: ReadonlySet<EngineKey> = new Set(['patterns', 'srt', 'dichotic', 'hint', 'matrix'])
 
 function detectEngine(cfg: TestTemplateParsed['config']): EngineKey {
   if (cfg.srt) return 'srt'
@@ -62,8 +62,8 @@ const ENGINES: Array<{ key: EngineKey; label: string; desc: string; enabled: boo
   { key: 'patterns', label: 'Patrones tonales (DPS/PPS/CUSTOM)', desc: 'Secuencias de tonos cortos/largos, memoria temporal, patrones.', enabled: true },
   { key: 'srt', label: 'Logoaudiometría SRT', desc: 'Umbral de recepción de habla con bracketing adaptativo.', enabled: true },
   { key: 'dichotic', label: 'Dichotic Digits', desc: 'Dígitos simultáneos por oído, recuerdo libre/dirigido.', enabled: true },
-  { key: 'hint', label: 'HINT / SinB', desc: 'Frases en ruido con SNR adaptativo.', enabled: false },
-  { key: 'matrix', label: 'Matrix 5-AFC', desc: 'Oraciones matriciales con grid 5×10 y SNR adaptativo.', enabled: false },
+  { key: 'hint', label: 'HINT / SinB', desc: 'Frases en ruido con SNR adaptativo.', enabled: true },
+  { key: 'matrix', label: 'Matrix 5-AFC', desc: 'Oraciones matriciales con grid 5×10 y SNR adaptativo.', enabled: true },
 ]
 
 export function TestsPage() {

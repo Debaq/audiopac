@@ -855,6 +855,101 @@ export async function playStimulusSequenceWithNoise(
 
 let stimulusBufferCache = new Map<string, AudioBuffer>()
 
+/**
+ * Reproduce un ítem SSW: 4 hemispondees con scheduling dicótico solapado.
+ *
+ * ear_first='R' (orden temporal):
+ *   R: [RNC][ RC ]
+ *   L:      [ LC ][LNC]
+ *
+ * ear_first='L':
+ *   L: [LNC][ LC ]
+ *   R:      [ RC ][RNC]
+ *
+ * Los pares competing (RC∥LC) se disparan con `startTime` idéntico para onset alignment.
+ */
+export async function playSSWItem(spec: {
+  rnc: AudioBuffer; rc: AudioBuffer; lc: AudioBuffer; lnc: AudioBuffer
+  rms_rnc?: number | null; rms_rc?: number | null; rms_lc?: number | null; rms_lnc?: number | null
+  level_db: number
+  ear_first: 'R' | 'L'
+  refDb?: number
+  curve?: CalibCurvePoint[]
+  onEnd?: () => void
+}): Promise<() => void> {
+  const ctx = await ensureRunning()
+  const curve = spec.curve
+  const refR = curve ? resolveRefDb(1000, 'right', curve) : (spec.refDb ?? resolveRefDb(1000, 'right'))
+  const refL = curve ? resolveRefDb(1000, 'left', curve) : (spec.refDb ?? resolveRefDb(1000, 'left'))
+
+  const merger = ctx.createChannelMerger(2)
+  merger.connect(ctx.destination)
+
+  const mk = (buf: AudioBuffer, rms: number, ear: 'R' | 'L'): AudioBufferSourceNode => {
+    const src = ctx.createBufferSource()
+    src.buffer = buf
+    const g = ctx.createGain()
+    const ref = ear === 'R' ? refR : refL
+    g.gain.value = dbToGain(spec.level_db - rms, ref)
+    src.connect(g)
+    g.connect(merger, 0, ear === 'R' ? 1 : 0)
+    return src
+  }
+
+  const rmsRnc = spec.rms_rnc ?? -20
+  const rmsRc = spec.rms_rc ?? -20
+  const rmsLc = spec.rms_lc ?? -20
+  const rmsLnc = spec.rms_lnc ?? -20
+
+  const srcRNC = mk(spec.rnc, rmsRnc, 'R')
+  const srcRC = mk(spec.rc, rmsRc, 'R')
+  const srcLC = mk(spec.lc, rmsLc, 'L')
+  const srcLNC = mk(spec.lnc, rmsLnc, 'L')
+
+  const t0 = ctx.currentTime + 0.05
+
+  // Duraciones
+  const dRNC = spec.rnc.duration
+  const dRC = spec.rc.duration
+  const dLC = spec.lc.duration
+  const dLNC = spec.lnc.duration
+
+  let tFirst: number, tCompeting: number, tLast: number, totalDur: number
+  let srcFirst: AudioBufferSourceNode, srcComp1: AudioBufferSourceNode, srcComp2: AudioBufferSourceNode, srcLast: AudioBufferSourceNode
+
+  if (spec.ear_first === 'R') {
+    tFirst = t0
+    tCompeting = t0 + dRNC
+    tLast = t0 + dRNC + Math.max(dRC, dLC)
+    totalDur = dRNC + Math.max(dRC, dLC) + dLNC
+    srcFirst = srcRNC; srcComp1 = srcRC; srcComp2 = srcLC; srcLast = srcLNC
+  } else {
+    tFirst = t0
+    tCompeting = t0 + dLNC
+    tLast = t0 + dLNC + Math.max(dLC, dRC)
+    totalDur = dLNC + Math.max(dLC, dRC) + dRNC
+    srcFirst = srcLNC; srcComp1 = srcLC; srcComp2 = srcRC; srcLast = srcRNC
+  }
+
+  srcFirst.start(tFirst)
+  srcComp1.start(tCompeting)
+  srcComp2.start(tCompeting)
+  srcLast.start(tLast)
+
+  let fired = false
+  const fireEnd = () => { if (fired) return; fired = true; spec.onEnd?.() }
+  srcLast.onended = fireEnd
+  const safetyTimer = setTimeout(fireEnd, (0.05 + totalDur + 0.2) * 1000)
+
+  return () => {
+    clearTimeout(safetyTimer)
+    try { srcRNC.stop() } catch {}
+    try { srcRC.stop() } catch {}
+    try { srcLC.stop() } catch {}
+    try { srcLNC.stop() } catch {}
+  }
+}
+
 export async function loadStimulusBuffer(absPath: string, bytes: Uint8Array): Promise<AudioBuffer> {
   const cached = stimulusBufferCache.get(absPath)
   if (cached) return cached

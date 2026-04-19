@@ -10,21 +10,25 @@ import { Textarea } from '@/components/ui/textarea'
 import { SequenceBuilder } from '@/components/SequenceBuilder'
 import { SRTConfigEditor, BLANK_SRT } from '@/components/editors/SRTConfigEditor'
 import { DichoticConfigEditor, BLANK_DICHOTIC } from '@/components/editors/DichoticConfigEditor'
+import { HINTConfigEditor, BLANK_HINT } from '@/components/editors/HINTConfigEditor'
+import { MatrixConfigEditor, BLANK_MATRIX } from '@/components/editors/MatrixConfigEditor'
+import { SSWConfigEditor, BLANK_SSW } from '@/components/editors/SSWConfigEditor'
 import { SharedConfigSection } from '@/components/editors/SharedConfigSection'
 import { AdvancedJsonEditor } from '@/components/editors/AdvancedJsonEditor'
 import { getTemplate, createTemplate, updateTemplate } from '@/lib/db/templates'
 import { playTonePreview, playSequence, ensureRunning } from '@/lib/audio/engine'
 import { useAuth } from '@/stores/auth'
 import { cn } from '@/lib/utils'
-import type { TestType, TestConfig, SRTParams, DichoticDigitsParams } from '@/types'
+import type { TestType, TestConfig, SRTParams, DichoticDigitsParams, HINTParams, MatrixParams, SSWParams } from '@/types'
 
-type EngineKey = 'patterns' | 'srt' | 'dichotic' | 'hint' | 'matrix'
+type EngineKey = 'patterns' | 'srt' | 'dichotic' | 'hint' | 'matrix' | 'ssw'
 
 function detectEngine(cfg: TestConfig): EngineKey {
   if (cfg.srt) return 'srt'
   if (cfg.dichotic_digits) return 'dichotic'
   if (cfg.hint) return 'hint'
   if (cfg.matrix) return 'matrix'
+  if (cfg.ssw) return 'ssw'
   return 'patterns'
 }
 
@@ -70,9 +74,51 @@ const BLANK_DICHOTIC_CONFIG: TestConfig = {
   dichotic_digits: BLANK_DICHOTIC,
 }
 
+const BLANK_HINT_CONFIG: TestConfig = {
+  tones: {},
+  isi_ms: 0,
+  iri_ms: 0,
+  envelope_ms: 0,
+  pattern_length: 0,
+  practice_sequences: [],
+  test_sequences: [],
+  channel: 'binaural',
+  level_db: 65,
+  hint: BLANK_HINT,
+}
+
+const BLANK_MATRIX_CONFIG: TestConfig = {
+  tones: {},
+  isi_ms: 0,
+  iri_ms: 0,
+  envelope_ms: 0,
+  pattern_length: 0,
+  practice_sequences: [],
+  test_sequences: [],
+  channel: 'binaural',
+  level_db: 65,
+  matrix: BLANK_MATRIX,
+}
+
+const BLANK_SSW_CONFIG: TestConfig = {
+  tones: {},
+  isi_ms: 0,
+  iri_ms: 2000,
+  envelope_ms: 0,
+  pattern_length: 0,
+  practice_sequences: [],
+  test_sequences: [],
+  channel: 'binaural',
+  level_db: 50,
+  ssw: BLANK_SSW,
+}
+
 function blankForEngine(engine: EngineKey): TestConfig {
   if (engine === 'srt') return BLANK_SRT_CONFIG
   if (engine === 'dichotic') return BLANK_DICHOTIC_CONFIG
+  if (engine === 'hint') return BLANK_HINT_CONFIG
+  if (engine === 'matrix') return BLANK_MATRIX_CONFIG
+  if (engine === 'ssw') return BLANK_SSW_CONFIG
   return BLANK_PATTERNS_CONFIG
 }
 
@@ -201,6 +247,18 @@ export function TestEditorPage() {
       alert('Dichotic Digits requiere elegir una lista de estímulos.')
       return
     }
+    if (engine === 'hint' && !config.hint?.stimulus_list_code) {
+      alert('HINT / SinB requiere elegir una lista de frases.')
+      return
+    }
+    if (engine === 'matrix' && !config.matrix?.stimulus_list_code) {
+      alert('Matrix requiere elegir una lista con asignación de columnas.')
+      return
+    }
+    if (engine === 'ssw' && !config.ssw?.stimulus_list_code) {
+      alert('SSW requiere elegir una lista con 160 hemispondees.')
+      return
+    }
     setSaving(true)
     try {
       const practice = mode === 'visual' ? practiceSeqs : parsedPractice
@@ -289,6 +347,57 @@ export function TestEditorPage() {
           <DichoticConfigEditor
             value={config.dichotic_digits}
             onChange={(dichotic_digits: DichoticDigitsParams) => setConfig({ ...config, dichotic_digits })}
+            disabled={isStandard}
+            onGoToRecord={goToRecord}
+          />
+          <div className="mb-4">
+            <SharedConfigSection value={config} onChange={setConfig} disabled={isStandard} />
+          </div>
+          <div className="mb-4">
+            <AdvancedJsonEditor value={config} onChange={setConfig} disabled={isStandard} />
+          </div>
+        </>
+      )}
+
+      {engine === 'hint' && config.hint && (
+        <>
+          <HINTConfigEditor
+            value={config.hint}
+            onChange={(hint: HINTParams) => setConfig({ ...config, hint })}
+            disabled={isStandard}
+            onGoToRecord={goToRecord}
+          />
+          <div className="mb-4">
+            <SharedConfigSection value={config} onChange={setConfig} disabled={isStandard} />
+          </div>
+          <div className="mb-4">
+            <AdvancedJsonEditor value={config} onChange={setConfig} disabled={isStandard} />
+          </div>
+        </>
+      )}
+
+      {engine === 'matrix' && config.matrix && (
+        <>
+          <MatrixConfigEditor
+            value={config.matrix}
+            onChange={(matrix: MatrixParams) => setConfig({ ...config, matrix })}
+            disabled={isStandard}
+            onGoToRecord={goToRecord}
+          />
+          <div className="mb-4">
+            <SharedConfigSection value={config} onChange={setConfig} disabled={isStandard} />
+          </div>
+          <div className="mb-4">
+            <AdvancedJsonEditor value={config} onChange={setConfig} disabled={isStandard} />
+          </div>
+        </>
+      )}
+
+      {engine === 'ssw' && config.ssw && (
+        <>
+          <SSWConfigEditor
+            value={config.ssw}
+            onChange={(ssw: SSWParams) => setConfig({ ...config, ssw })}
             disabled={isStandard}
             onGoToRecord={goToRecord}
           />

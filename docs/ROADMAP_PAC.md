@@ -160,7 +160,7 @@ Objetivo: que los dB reportados sean dB SPL reales, no pseudo-calibrados.
 - ✅ **Dichotic Digits ES** (migración 014). Plantillas `DD_ES_FREE` (recuerdo libre) y `DD_ES_DIRECTED` (recuerdo dirigido alternando oído inicial). Usa `playStimulusPair` en `engine.ts` para disparar dos `AudioBuffer` simultáneos con mismo `startTime` (uno por oído). Lista `DICHOTIC_DIGITS_ES` (mig 012) con dígitos 1–9 excluyendo "siete". Scoring por oído con asimetría (R − L). Pares configurables (default 20 pares · 2 dígitos/oído · 55 dB HL).
 - ✅ **SinB-ES** (pack `sinb-es-v1`). Variante HINT con ruido **SSN** (Speech-Shaped Noise = rosa filtrado LP 1 kHz Q=0.707, aproxima LTASS habla). Engine: extendido `NoiseType` con `'ssn'`, `playStimulusWithNoise` y `makeNoiseHead` insertan BiquadFilter LP cuando aplica. `noiseRmsDbfs = -20` para SSN. Pack reusa `HINTController` (sin runner nuevo) con `noise_type:'ssn'`. Lista vacía `requirements:'recording'`. Norma `srt_db` por edad (jóvenes -8 a -3, mayores -2 a 8).
 - ✅ **Matrix-ES** publicado (`matrix-es-v1`). Nuevo runner `MatrixController` con SNR bracketing 5-AFC por columna. `playStimulusSequenceWithNoise` concatena N buffers en serie con ruido continuo. Grid 5×10 clickeable en `MatrixRun.tsx`. Usuario graba 50 palabras con `metadata.column` 0-4.
-- 📝 **SSW adaptado** — diseño en sección 7 del roadmap. Prioridad baja (overlap con Dichotic Digits, validación ES débil).
+- 📝 **SSW adaptado** — plan completo (corpus + motor + runner + editor + informe + pack) en §7. Prioridad baja (overlap con Dichotic Digits, validación ES débil) pero implementación estimada 1–2 sesiones una vez redactado el corpus.
 
 ### Fase 5 — Ruido (bonus) ✅ parcial (migración 007)
 - ✅ Generador de ruido blanco (buffer random en loop)
@@ -291,7 +291,7 @@ Ficha muestra: descripción, licencia, referencias, cantidad de tests/listas, ta
 #### 6.6 Paquetes pendientes de crear (cuando el sistema esté listo)
 
 - ✅ **Matrix-ES** (Hochmuth 2012) publicado (`matrix-es-v1`). Estructura 5 columnas × 10 palabras. Nuevo runner `MatrixController` (`src/lib/audio/matrixRunner.ts`) con SNR bracketing 5-AFC por columna. UI `MatrixRun.tsx` con grid clickeable 5×10. Engine: `playStimulusSequenceWithNoise` concatena N buffers con gap inter-palabra y ruido continuo. Metadata `column` (0-4) por stimulus asigna a qué columna pertenece. Audios HörTech cerrados → pack solo trae estructura; usuario graba sus 50 palabras.
-- **SSW adaptado** — ver sección 7 (diseño)
+- **SSW adaptado** — ver §7 (plan completo con corpus, motor `playSSWItem`, runner, editor, informe y pack)
 - ✅ **SinB-ES** publicado (`sinb-es-v1`)
 - ✅ **PALPA-E** publicado (`palpa-es-v1`); PAL listas LatAm cubiertas por `logoaud-latam-v1`
 - ✅ **HINT-ES clínico v2** publicado (`hint-es-clinico-v1`). 70 tests `HINT_SHARVARD_L01..L70` predefinidos apuntando a las listas Sharvard (generado por `scripts/build-hint-es-clinico-pack.mjs`). A diferencia de `sharvard-es-v1` (sólo L01 como template a clonar), este pack expone cada lista como test seleccionable directamente desde `/tests`. `requirements: audio_pack` — requiere catálogo Sharvard ES + pack audio instalados.
@@ -307,9 +307,11 @@ Ficha muestra: descripción, licencia, referencias, cantidad de tests/listas, ta
 
 ---
 
-## 7. SSW adaptado ES (diseño preliminar)
+## 7. SSW adaptado ES — plan completo de implementación ✅ hecho (v1.0.0-beta)
 
-**SSW** (Staggered Spondaic Word Test — Katz 1962) evalúa procesamiento auditivo central adulto/pediátrico con **pares spondee dicóticos parcialmente solapados**. Cuatro condiciones por ítem:
+**Estado (2026-04-19):** pack `ssw-es-v1` publicado en `audiopac-assets`. Motor `playSSWItem`, `SSWController` runner, `SSWConfigEditor`, `SSWRun`, `SSWReportCard` y placeholders `ssw_*` en `fillReportTemplate` integrados. Migración 003 agrega `category='ssw'` y `test_type='SSW'` al schema. Corpus beta (40 ítems × 4 hemispondees = 160 tokens) pseudo-compuestos bisílabos llanos — requiere validación clínica y grabación por usuario.
+
+**SSW** (Staggered Spondaic Word Test — Katz 1962, rev. 1998) evalúa procesamiento auditivo central adulto/pediátrico con **pares spondee dicóticos parcialmente solapados**. Cuatro condiciones por ítem:
 
 ```
    oído →   DERECHO            IZQUIERDO
@@ -317,63 +319,342 @@ Ficha muestra: descripción, licencia, referencias, cantidad de tests/listas, ta
                    [  LC  ][ LNC ]
 ```
 
-- **RNC** (Right Non-Competing): spondee derecho, primer hemispondee aislado
-- **RC** (Right Competing): segundo hemispondee derecho simultáneo con LC izquierdo
-- **LC** (Left Competing): primer hemispondee izquierdo simultáneo con RC
-- **LNC** (Left Non-Competing): segundo hemispondee izquierdo aislado
+- **RNC** (Right Non-Competing): primer hemispondee derecho, aislado (sólo R).
+- **RC** (Right Competing): segundo hemispondee derecho, simultáneo con LC.
+- **LC** (Left Competing): primer hemispondee izquierdo, simultáneo con RC.
+- **LNC** (Left Non-Competing): segundo hemispondee izquierdo, aislado (sólo L).
 
-Ejemplo clásico: derecho = "SUN-up", izquierdo = "dayLIGHT" → "SUN" [RNC] + ("up" || "day") [RC/LC] + "LIGHT" [LNC]. Total 4 palabras por ítem, 40 ítems.
+Ejemplo EN clásico: R="SUN-up", L="dayLIGHT" → `"SUN"`[RNC] + (`"up"` ∥ `"day"`)[RC/LC] + `"LIGHT"`[LNC]. 40 ítems × 4 palabras = 160 respuestas por sesión.
 
-### 7.1 Adaptación ES
+El protocolo alterna **ear-first** (R-first / L-first) mitad y mitad para medir efectos de orden. Presentación ~50 dB HL sobre SRT. Requiere SRT previo o asumido.
 
-Traducir 40 spondees inglés → pares bisílabos ES balanceados fonémicamente. Candidatos: "buen-día", "sol-rey", "luz-mar", "pan-sal"… Usar corpus PAL como pool. Validar solape sintáctico-acústico: cada hemi-spondee debe ser palabra completa reconocible aislada.
+### 7.1 Corpus ES (160 hemispondees)
 
-### 7.2 Schema
+**Estrategia**: armar 40 pares spondee donde cada mitad (hemispondee) sea palabra ES autónoma bisílaba acentuada en primera sílaba (tensionada), con solape semántico-acústico suficiente para evocar el spondee compuesto.
 
-**Nuevo tipo lista**: `StimulusCategory = 'ssw'` o extender `metadata` para marcar rol `hemispondee` + `item_id` (número de par) + `side` ('R'|'L') + `position` (1|2).
+Pool candidato:
+- Compuestos lexicalizados: `buen|día`, `sol|rey`, `luz|mar`, `pan|sal`, `mal|tiempo`, `medio|día`, `casa|grande`, `papel|blanco`, `agua|fría`, `pelo|negro`.
+- Pares tipo adjetivo+sustantivo / sustantivo+sustantivo balanceados por clase articulatoria (usar `PhonemeBalanceChart` para verificar).
+- Evitar: hiatos ambiguos, sinalefa que fusione hemis, palabras > 2 sílabas, pares con fricativas largas que invaden el siguiente slot.
 
-**Stimulus**:
-```
-token: "sun"
-metadata: { ssw_item: 1, side: "R", position: 1 }
-```
+**Validación acústica**: duración de cada hemispondee 400–650 ms; onset alignment post-VAD; fade 10 ms; nivel RMS −20 dBFS por ítem. `processClip` ya cubre esto (ver Fase 1).
 
-40 ítems × 2 lados × 2 hemispondees = **160 grabaciones**.
+**Listas**: `SSW_ES_FORM_A` (40 pares) + opcional `SSW_ES_FORM_B` retest. 160 grabaciones por forma.
 
-### 7.3 Engine
+### 7.2 Schema — stimuli + metadata
 
-Reusar `playStimulusPair(bufferL, bufferR, ...)` + offset temporal:
-- Arranque: RNC solo (buffer R, position 1)
-- `t = dur(RNC)`: start RC (R, pos 2) y LC (L, pos 1) simultáneos con `playStimulusPair`
-- `t = dur(RNC) + max(dur(RC), dur(LC))`: LNC solo (buffer L, position 2)
+Reutilizar `stimuli.metadata_json` para marcar rol:
 
-O función nueva `playSSWItem(rnc, rc, lc, lnc, opts)` con scheduling explícito en un AudioContext único.
-
-### 7.4 Runner
-
-`SSWController` con score por condición:
-```ts
+```jsonc
 {
-  RNC: { correct: 0..40, total: 40 },
-  RC:  { ... },
-  LC:  { ... },
-  LNC: { ... },
+  "ssw_item": 1,        // 1..40
+  "side": "R",          // 'R' | 'L'
+  "position": 1,        // 1 = first hemispondee, 2 = second
+  "pair_label": "buen-día"   // opcional, texto canónico del spondee
 }
 ```
 
-Métrica clínica: **raw score total**, **corrected score** (ajuste por edad), **ear effect** (R-L), **order effect** (RNC+RC vs LC+LNC), **reversals** (confusión secuencial).
+Nueva categoría: `StimulusCategory = 'ssw'` (agregar al CHECK de `001_initial.sql` vía migración aditiva 002, o aceptar `'custom'` + filtrar por metadata — preferir categoría explícita para filtrado en UI).
 
-### 7.5 UI
+160 grabaciones = 40 × 2 lados × 2 posiciones. Cada una con metadata completo.
 
-`SSWRun.tsx` con 4 inputs de texto (o 4 grids 40-alternatives si cerramos pool) post-trial. Marcar correct/incorrect por palabra. Progreso 40 items.
+### 7.3 Motor — `playSSWItem`
 
-### 7.6 Pack
+Nueva función en `src/lib/audio/engine.ts`:
 
-`ssw-es-v1.json` `requirements: recording` (usuario graba las 160 palabras). Interpretación: norms_by_age para raw + ear_effect pct.
+```ts
+interface SSWItemSpec {
+  rnc: AudioBuffer           // R, pos 1
+  rc:  AudioBuffer           // R, pos 2
+  lc:  AudioBuffer           // L, pos 1
+  lnc: AudioBuffer           // L, pos 2
+  level_db: number           // SPL por canal (ambos oídos mismo nivel)
+  ear_first: 'R' | 'L'       // si 'L', swap RNC↔LNC y RC↔LC para inversión temporal
+  ref_db?: number
+  curve?: CalibCurvePoint[]
+}
 
-### 7.7 Prioridad
+export function playSSWItem(spec: SSWItemSpec): { stop: () => void; finished: Promise<void> }
+```
 
-**Baja** — SSW tiene controversia metodológica (validación cruzada débil en ES) y overlap con Dichotic Digits + HINT. Diferir hasta demanda clínica concreta.
+Scheduling en un único `AudioContext`:
+1. `t=0`: start RNC en canal R (gain_l=0, gain_r=1).
+2. `t = dur(RNC)`: start RC en R **y** LC en L con `startTime` idéntico (`ctx.currentTime + dur(rnc)` en el mismo scheduling pass para onset alignment).
+3. `t = dur(RNC) + max(dur(RC), dur(LC))`: start LNC en L.
+
+Usar `BufferSource` + `ChannelMerger` (2 canales) + `Gain` por canal para routing estricto. Aplicar `dbToGain(level_db, ref_db, 1000, ear_from_channel, curve)` por source. Ramp-in/out 10 ms.
+
+Si `ear_first='L'`: swap — la secuencia empieza por LNC en L, etc.
+
+Retornar `finished` Promise que resuelve tras `dur(RNC)+dur(RC|LC)+dur(LNC)`.
+
+**No crear** runner adaptativo: SSW no adapta nivel, es 40 ítems a nivel fijo.
+
+### 7.4 Tipos + plantilla
+
+`src/types/index.ts`:
+
+```ts
+export interface SSWParams {
+  /** Lista SSW con 160 hemispondees marcados en metadata. */
+  stimulus_list_code: string
+  /** Nivel presentación por canal, dB HL. */
+  level_db: number
+  /** Items a presentar (default 40). */
+  num_items?: number
+  /** Cómo alternar ear-first por ítem. */
+  ear_first_order?: 'RLRL' | 'LRLR' | 'RRLL' | 'random' | 'fixed_R' | 'fixed_L'
+  /** Mostrar pair_label al paciente (raro — sólo ensayo). */
+  show_pair_label?: boolean
+  /** ISI entre ítems, ms. */
+  iri_ms?: number
+}
+```
+
+Extender `TestConfig`:
+
+```ts
+interface TestConfig {
+  // ...
+  ssw?: SSWParams
+}
+```
+
+`TestType` se extiende con `'SSW'` (pack trae `test_type: 'SSW'`).
+
+### 7.5 Runner — `SSWController`
+
+`src/lib/audio/sswRunner.ts`:
+
+```ts
+interface SSWTrial {
+  index: number                 // 0..num_items-1
+  item_id: number               // 1..40
+  ear_first: 'R' | 'L'
+  spec: SSWItemSpec             // buffers + nivel resueltos
+  expected: {                   // ground truth
+    RNC: string; RC: string; LC: string; LNC: string
+  }
+  given?: {                     // respuesta
+    RNC: string | null; RC: string | null; LC: string | null; LNC: string | null
+  }
+  correct?: { RNC: boolean; RC: boolean; LC: boolean; LNC: boolean }
+  reversal?: boolean            // orden de reporte invertido
+  presented_at?: number
+  answered_at?: number
+}
+
+interface SSWState {
+  trials: SSWTrial[]
+  currentIndex: number
+  isPlaying: boolean
+  finished: boolean
+}
+
+class SSWController {
+  constructor(params: SSWParams, stimuli: Stimulus[], refDb?: number, curve?: CalibCurvePoint[])
+  subscribe(fn: (s: SSWState) => void): () => void
+  hydrate(prev: PrevResponse[]): void
+  async playCurrent(): Promise<void>
+  answer(resp: SSWTrial['given']): void
+  next(): void
+  finalize(): SSWScore
+  stop(): void
+}
+```
+
+Persistencia por trial en `responses`:
+
+- `expected_pattern`: `"RNC:buen|RC:día|LC:sol|LNC:rey|first:R"`
+- `given_pattern`: `"RNC:buen|RC:dia|LC:so|LNC:rey"`
+- `is_correct`: `1` si las 4 correctas, `0` sino (uso informativo; scoring real por condición).
+
+### 7.6 Scoring clínico — `SSWScore`
+
+```ts
+interface SSWScore {
+  total_errors: number                 // 0..160
+  raw_score_pct: number                // 100 * errors/160
+  by_condition: Record<'RNC'|'RC'|'LC'|'LNC', { correct: number; total: number; error_pct: number }>
+  by_ear: { R: { errors: number; total: 80 }; L: { errors: number; total: 80 } }
+  ear_effect_pct: number               // (L_err − R_err) — positivo = peor L
+  order_effect_pct: number             // ((RNC+LC) − (RC+LNC)) según orden temporal
+  reversals: number                    // nº de trials donde el paciente reportó en orden L→R cuando ear_first=R (o viceversa)
+  corrected_score_pct?: number         // ajuste por edad (si SSWParams trae age o lo toma del patient)
+  response_bias: 'none'|'left'|'right' // >15% asimetría según Katz
+  qualifiers: string[]                 // flags tipo 'significant ear_effect', 'high reversals', etc
+}
+```
+
+Tabla de norms por edad (Katz 1998, ajuste estándar):
+
+| Edad   | Raw errors normal | Leve   | Moderado | Severo |
+|--------|------------------:|-------:|---------:|-------:|
+| 11–60  | 0–15              | 16–25  | 26–40    | >40    |
+| 61–70  | 0–20              | 21–30  | 31–45    | >45    |
+| 71+    | 0–25              | 26–35  | 36–50    | >50    |
+
+Poblar en `pack.interpretation.norms_by_age`.
+
+### 7.7 Editor — `SSWConfigEditor`
+
+`src/components/editors/SSWConfigEditor.tsx`. Layout 2-cols (como SRT/Matrix):
+
+**Columna izquierda (params)**:
+- Selector lista `category='ssw'` + `+ Nueva` con seed de 160 tokens vacíos y metadata pre-asignado.
+- `level_db`, `num_items`, `iri_ms`.
+- Selector `ear_first_order` (RLRL / LRLR / RRLL / random / fixed_R / fixed_L).
+- Toggle `show_pair_label` (práctica).
+- Box explicativo Katz 1962/1998.
+
+**Columna derecha (corpus)**:
+- Grid 40 filas × 4 columnas (RNC, RC, LC, LNC) mostrando tokens + estado de grabación + pair_label.
+- Click en celda → `TokenInfoDialog` (reusa análisis fonético).
+- Botón "Auto-asignar metadata" que lee 160 tokens en orden y completa `ssw_item/side/position` secuencialmente (item 1 = pos 1–4, item 2 = 5–8, …).
+- Readiness: 160/160 grabados para habilitar iniciar.
+- Link "Guardar y grabar" → `/estímulos?list=CODE&returnTo=`.
+
+Usar el mismo patrón `SharedConfigSection` + `AdvancedJsonEditor`.
+
+Helper `updateStimulusMetadata` ya existe (se agregó para Matrix) — reusar.
+
+### 7.8 UI de ejecución — `SSWRun.tsx`
+
+Pantalla por trial:
+
+```
+Trial 12/40      ear-first: R     nivel: 50 dB HL
+
+   [  Reproducir spondee  ]
+
+   Paciente dijo:
+   ┌─────────────┬─────────────┬─────────────┬─────────────┐
+   │ RNC (R-1)   │ RC (R-2)    │ LC (L-1)    │ LNC (L-2)   │
+   │ [input    ] │ [input    ] │ [input    ] │ [input    ] │
+   │ esperado:   │ esperado:   │ esperado:   │ esperado:   │
+   │  "buen"     │  "día"      │  "sol"      │  "rey"      │
+   └─────────────┴─────────────┴─────────────┴─────────────┘
+   [ ✓ Correcto las 4 ]  [ Avanzar ]
+```
+
+- Botón "Reproducir" dispara `playSSWItem` via `SSWController`.
+- 4 inputs de texto (o toggle correct/incorrect con shortcut tecla 1/2/3/4).
+- Auto-scoring por comparación normalizada (lowercase, sin tildes, sin espacios). Override manual.
+- Reversal flag: se activa si el orden en que el paciente respondió difiere del orden temporal (`reversals`++).
+- Progreso chip por condición: RNC ✓8/12, RC ✓6/12, …
+- Atajos teclado: `1–4` toggle correct por slot, `Enter` siguiente, `R` repetir.
+
+Modal pre-start con consigna (de `patient_instructions_md`). Modal post-sesión con puntuación cruda y link al informe.
+
+### 7.9 Informe — card SSW en `SessionReportPage`
+
+Nueva tarjeta `<SSWReportCard score={SSWScore} age={patient.age} />`:
+
+- Tabla 4 condiciones (RNC/RC/LC/LNC) con errores, %, barra horizontal. Esperado: RC y LC >> RNC y LNC.
+- Desglose por oído: R errors vs L errors + badge asimetría.
+- Ear effect: valor absoluto + semáforo (≤5% normal, 5–15% leve, >15% significativo).
+- Order effect, reversals, response_bias.
+- Veredicto automático leyendo `pack.interpretation.norms_by_age` (usa infra existente de Fase 6.7).
+- Narrativa con `fillReportTemplate` (6.9) consumiendo placeholders SSW:
+  - `{{ssw_raw_pct}}`, `{{ssw_rnc_err}}`, `{{ssw_rc_err}}`, `{{ssw_lc_err}}`, `{{ssw_lnc_err}}`
+  - `{{ssw_ear_effect}}`, `{{ssw_order_effect}}`, `{{ssw_reversals}}`
+  - `{{ssw_verdict}}`
+
+Extender `TestScore` union para SSW y `test_sessions.test_score` tipado con `SSWScore`. Ya existe patrón similar (SRT/HINT/Matrix) — replicar.
+
+### 7.10 Pack `ssw-es-v1`
+
+`audiopac-assets/packs/ssw-es-v1.json`:
+
+```jsonc
+{
+  "id": "ssw-es-v1",
+  "version": "1.0.0",
+  "name": "SSW — Staggered Spondaic Word (ES)",
+  "category": "pac.dichotic",
+  "requirements": "recording",
+  "license": "CC-BY",
+  "description_md": "# SSW...\n40 pares spondee dicóticos solapados (Katz 1962/1998).",
+  "author": { "name": "audiopac" },
+  "references": [
+    { "citation": "Katz J. The use of staggered spondaic words for assessing the integrity of the central auditory nervous system. J Audit Res. 1962", "year": 1962 },
+    { "citation": "Katz J. SSW Test Manual. 5th ed. 1998", "year": 1998 },
+    { "citation": "Brunt M. The Staggered Spondaic Word Test. In Katz Handbook of Clinical Audiology 2015", "year": 2015 }
+  ],
+  "tests": [{
+    "code": "SSW_ES_FORM_A",
+    "name": "SSW español — Forma A",
+    "family": "pac.dichotic",
+    "purpose_md": "Evalúa procesamiento auditivo central...",
+    "how_it_works_md": "Pares spondee solapados con condiciones RNC/RC/LC/LNC...",
+    "protocol_md": "1. SRT previo. 2. Presentar a SRT+50 dB HL. 3. 40 ítems alternando ear-first...",
+    "target_population_md": "11+ años, sospecha TPAC...",
+    "contraindications_md": "Pérdida auditiva asimétrica >10 dB, cooperación limitada...",
+    "estimated_duration_min": 15,
+    "min_age_years": 11,
+    "config": {
+      "tones": {}, "isi_ms": 0, "iri_ms": 2000, "envelope_ms": 10, "pattern_length": 0,
+      "practice_sequences": [], "test_sequences": [], "channel": "binaural", "level_db": 50,
+      "ssw": {
+        "stimulus_list_code": "SSW_ES_FORM_A",
+        "level_db": 50,
+        "num_items": 40,
+        "ear_first_order": "RLRL",
+        "iri_ms": 2000
+      }
+    }
+  }],
+  "lists": [{
+    "code": "SSW_ES_FORM_A",
+    "name": "SSW ES — Forma A (160 hemispondees)",
+    "category": "ssw",
+    "country_code": "LATAM",
+    "items": [
+      /* 160 entries con { token, position, metadata_json: {ssw_item,side,position,pair_label} } */
+    ]
+  }],
+  "interpretation": {
+    "metric": "raw_score_pct",
+    "norms_by_age": [
+      { "age_min": 11, "age_max": 60, "normal_max": 9.4, "mild_max": 15.6, "severe_min": 25 },
+      { "age_min": 61, "age_max": 70, "normal_max": 12.5, "mild_max": 18.75, "severe_min": 28 },
+      { "age_min": 71, "age_max": 120, "normal_max": 15.6, "mild_max": 21.9, "severe_min": 31 }
+    ],
+    "description_md": "Raw score > normal sugiere compromiso PAC. Ear effect >15% indica asimetría interaural relevante. Reversals elevados = problema de ordenamiento temporal."
+  },
+  "report_template_md": "# {{test_name}}\n\nPaciente {{patient_name}} ({{patient_age}} años)...\n\nPuntuación cruda: {{ssw_raw_pct}}% errores (veredicto: {{ssw_verdict}})."
+}
+```
+
+### 7.11 Migración / DB
+
+- **Migración 002 aditiva**: `ALTER TABLE stimulus_lists` no necesario; agregar `'ssw'` al CHECK de `stimuli_lists.category` mediante recreación (SQLite no soporta ALTER CHECK). Alternativa: usar `'custom'` y filtrar en UI por metadata → más limpio evitar migración.
+- `TestType` en app: agregar `'SSW'` al union (`src/types/index.ts`).
+- Sin columnas nuevas — todo va en `metadata_json`.
+
+**Decisión sugerida**: usar `category = 'ssw'` con migración aditiva porque facilita filtrado y el UX del editor. Migración mínima (recrea tabla preservando filas).
+
+### 7.12 Plan de fases
+
+1. **7.12.1 Corpus** — armar y validar 40 pares ES. Publicar como `ssw-es-v1` texto-only (sin audio; requirements:'recording'). Balance fonémico validado con `PhonemeBalanceChart`.
+2. **7.12.2 Schema + tipos** — `SSWParams`, `TestConfig.ssw`, `TestType: 'SSW'`, migración 002 con `category='ssw'`.
+3. **7.12.3 Motor** — `playSSWItem` en `engine.ts` con scheduling dual-channel preciso.
+4. **7.12.4 Runner** — `SSWController` + persistencia trials + hydrate.
+5. **7.12.5 Editor** — `SSWConfigEditor` con grid 40×4 + auto-asignación metadata + readiness 160.
+6. **7.12.6 UI ejecución** — `SSWRun.tsx` con 4 inputs + atajos + reversal detection.
+7. **7.12.7 Scoring** — `computeSSWScore` con todas las métricas + normativa.
+8. **7.12.8 Informe** — `<SSWReportCard>` en `SessionReportPage` + extensión `fillReportTemplate` con placeholders SSW.
+9. **7.12.9 Pack** — publicar `ssw-es-v1` en `audiopac-assets` con ficha clínica completa (purpose/how/protocol/target/contraindic + refs Katz/Brunt/Musiek).
+10. **7.12.10 QA clínico** — validar con 5 sujetos normales y 5 con TPAC conocido; comparar contra norms. Ajustar corte normativo si difiere significativamente de Katz US-EN.
+
+### 7.13 Riesgos y decisiones abiertas
+
+- **Validación ES**: Katz 1998 norma sobre corpus EN. Cualquier adaptación ES inherentemente carece de validación publicada — pack se presenta como **investigativo**, no diagnóstico. Badge "uso investigativo" en banner del test.
+- **Solape acústico**: si hemispondees tienen durations muy distintas, RC y LC no alinean bien. Normalizar durations a rango 450–550 ms post-grabación (warning en editor si sale de ese rango).
+- **Response bias vs real pathology**: paciente con sesgo atencional puede inflar ear_effect. Mitigación: catch trials tipo "¿cuál oído fue primero?" cada 10 ítems (pendiente decidir si agregar).
+- **Reversals detection**: requiere que el paciente reporte en un orden específico. Si se ingresa correct/incorrect sin orden, reversal=null. Exponer ambos modos.
+- **Overlap con Dichotic Digits**: SSW cubre procesamiento temporal+atencional dicótico, Dichotic cubre integración binaural pura. No son redundantes; ofrecer ambos.
+- **Prioridad real**: baja por validación ES débil, pero viable de implementar en 1–2 sesiones de trabajo una vez redactado el corpus.
 
 ---
 
@@ -526,7 +807,7 @@ Es un refactor medio-grande: UI + schema pack + backfill de contenido clínico (
 
 ### 8.6 Editores por motor
 
-**Estado actual (MVP v1):** SRT y Dichotic Digits tienen editores nativos. HINT y Matrix siguen solo vía packs estándar (pendiente).
+**Estado actual (MVP v2):** SRT, Dichotic Digits, HINT/SinB y Matrix 5-AFC tienen editores nativos. Los 5 motores cubiertos.
 
 #### 8.6.1 Infraestructura común ✅ hecho
 
@@ -572,10 +853,10 @@ Es un refactor medio-grande: UI + schema pack + backfill de contenido clínico (
 - Explicación **modos** en UI: libre (Musiek 1983, sensibilidad cortical temporal/callosa) vs dirigido (Strouse-Wilson 1999, atención selectiva top-down).
 - Readiness con link "Guardar y grabar".
 
-#### 8.6.4 Editores pendientes
+#### 8.6.4 Editores HINT y Matrix ✅ hecho
 
-- ⏳ **HINT / SinB**: `config.hint` — `stimulus_list_code`, `start_snr_db`, `noise_level_db`, `noise_type` (pink/ssn/white), `sentences_per_level`, `threshold_pass_ratio`, pasos SNR, bounds.
-- ⏳ **Matrix 5-AFC**: `config.matrix` — `stimulus_list_code`, `columns`, `start_snr_db`, `noise_level_db`, `noise_type`, `inter_word_gap_ms`, `sentences_per_level`, `threshold_pass_ratio`, pasos, bounds, `max_total_trials`. Nota: metadata `column` (0..4) por stimulus se edita en `/estimulos`.
+- ✅ **HINT / SinB** (`src/components/editors/HINTConfigEditor.tsx`). Layout 2-cols: params (SNR inicial, pasos ↑/↓, pass ratio, bounds, frases/nivel, max trials, tipo ruido pink/ssn/white, nivel ruido SPL) + panel derecho con frases, badges de audio y keywords, readiness gating y `PhonemeBalanceChart`. Crea listas `category='sentence'` inline.
+- ✅ **Matrix 5-AFC** (`src/components/editors/MatrixConfigEditor.tsx`). Layout 2-cols: params (columnas, gap inter-palabra, SNR adaptativo, ruido SSN/pink/white, bounds) + grid de asignación de columnas donde cada token tiene un `<select>` de columna (`metadata.column`). Botón "Asignar en secuencia" cicla 0,1,…,N-1 sobre el orden actual. Panel "sin columna" resalta tokens huérfanos. Helper nuevo `updateStimulusMetadata()` en `src/lib/db/stimuli.ts` persiste `metadata.column`.
 
 #### 8.6.5 Análisis fonético español ✅ hecho
 
@@ -728,8 +1009,8 @@ Prioridad (ruta C mixta ya definida en §8.6.6 — primero expandir schemas, esc
 3. ✅ **Dichotic v2** — `directed_block_order` (lrlr/llrr/interleaved) + `catch_trials` (count/placement random/every_n/start_end) + `scoring_granularity` (per_pair/per_position/per_digit) + `practice_instructions_md`. Runner inserta catch trials mono, `firstEarFor()` para block order, `answerDigit()` per-digit. UI con badge catch + modal práctica.
 4. ✅ **SRT cutoff_rule** y Dichotic `examiner_notes_md` (compartido en `SharedConfigSection`).
 5. ✅ **Escape hatch JSON** — `<AdvancedJsonEditor>` acordeón genérico con validación en vivo, aplicar/revertir, preserva `advanced_json` y campos fuera de UI. Integrado en editores SRT y Dichotic.
-6. **HINT editor** (§8.6.4) — arrancar con los knobs básicos de `HINTParams`, aplicar el mismo patrón de 2 cols + patient_instructions + balance fonémico.
-7. **Matrix editor** (§8.6.4) — idem HINT, especializar para grid 5×10.
+6. ✅ **HINT editor** (§8.6.4) — knobs básicos de `HINTParams` + 2 cols + SharedConfigSection + AdvancedJsonEditor + balance fonémico.
+7. ✅ **Matrix editor** (§8.6.4) — grid de asignación `metadata.column` por token + auto-asignación en secuencia.
 
 ##### 8.6.6.6 Próximas ampliaciones del análisis fonético
 

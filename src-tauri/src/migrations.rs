@@ -19,5 +19,11 @@ pub fn get_migrations() -> Vec<Migration> {
             sql: include_str!("../migrations/002_noise_calibration.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 3,
+            description: "ssw_support",
+            sql: include_str!("../migrations/003_ssw.sql"),
+            kind: MigrationKind::Up,
+        },
     ]
 }

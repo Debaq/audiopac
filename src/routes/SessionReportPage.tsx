@@ -17,6 +17,8 @@ import {
   type TemplatePackInfo, type Verdict,
 } from '@/lib/packs/interpretation'
 import { Markdown } from '@/lib/markdown'
+import { scoreFromResponses as sswScoreFromResponses } from '@/lib/audio/sswRunner'
+import type { SSWScore } from '@/types'
 import { save } from '@tauri-apps/plugin-dialog'
 import { writeFile } from '@tauri-apps/plugin-fs'
 
@@ -319,6 +321,10 @@ export function SessionReportPage() {
         </Card>
       )}
 
+      {template.config.ssw && (
+        <SSWReportCard responses={data.responses} />
+      )}
+
       {packInfo?.interpretation && (
         <PackNormsCard pack={packInfo} patientAge={calculateAge(patient.birth_date)} testScore={session.test_score ?? null} />
       )}
@@ -339,6 +345,12 @@ export function SessionReportPage() {
           verdict={verdictMeta.label}
           rtMean={analysis.test.rt.mean}
           rtMedian={analysis.test.rt.median}
+          sswScore={template.config.ssw ? sswScoreFromResponses(data.responses.filter(r => r.phase === 'test').map(r => ({
+            item_index: r.item_index,
+            expected_pattern: r.expected_pattern,
+            given_pattern: r.given_pattern,
+            is_correct: r.is_correct,
+          }))) : null}
         />
       )}
 
@@ -438,7 +450,7 @@ function PackNormsCard({
 
 function PackReportTemplateCard({
   pack, template, templateCode, patientName, patientAge, date, ear, examiner,
-  accuracy, correct, total, verdict, rtMean, rtMedian,
+  accuracy, correct, total, verdict, rtMean, rtMedian, sswScore,
 }: {
   pack: TemplatePackInfo
   template: string
@@ -454,6 +466,7 @@ function PackReportTemplateCard({
   verdict: string
   rtMean: number | null
   rtMedian: number | null
+  sswScore?: SSWScore | null
 }) {
   const interp = pack.interpretation
   const band = interp ? pickNormBand(interp.norms_by_age, patientAge) : null
@@ -481,6 +494,15 @@ function PackReportTemplateCard({
     norm_band: band ? `${band.age_min}–${band.age_max}` : null,
     pack_name: pack.name,
     pack_version: pack.version,
+    ssw_raw_pct: sswScore ? sswScore.raw_score_pct.toFixed(1) : null,
+    ssw_rnc_err: sswScore ? sswScore.by_condition.RNC.error_pct.toFixed(1) : null,
+    ssw_rc_err: sswScore ? sswScore.by_condition.RC.error_pct.toFixed(1) : null,
+    ssw_lc_err: sswScore ? sswScore.by_condition.LC.error_pct.toFixed(1) : null,
+    ssw_lnc_err: sswScore ? sswScore.by_condition.LNC.error_pct.toFixed(1) : null,
+    ssw_ear_effect: sswScore ? sswScore.ear_effect_pct.toFixed(1) : null,
+    ssw_order_effect: sswScore ? sswScore.order_effect_pct.toFixed(1) : null,
+    ssw_reversals: sswScore ? sswScore.reversals : null,
+    ssw_verdict: sswScore ? (sswScore.raw_score_pct <= 10 ? 'Normal' : sswScore.raw_score_pct <= 16 ? 'Limítrofe' : 'Bajo norma') : null,
   }
 
   const filled = fillReportTemplate(pack.report_template_md!, ctx)
@@ -490,6 +512,81 @@ function PackReportTemplateCard({
       <CardHeader><CardTitle className="text-base">Informe narrativo — {pack.name}</CardTitle></CardHeader>
       <CardContent>
         <Markdown source={filled} />
+      </CardContent>
+    </Card>
+  )
+}
+
+function SSWReportCard({ responses }: { responses: { item_index: number; expected_pattern: string; given_pattern: string | null; is_correct: number | null; phase: string }[] }) {
+  const testResponses = responses.filter(r => r.phase === 'test').map(r => ({
+    item_index: r.item_index,
+    expected_pattern: r.expected_pattern,
+    given_pattern: r.given_pattern,
+    is_correct: r.is_correct,
+  }))
+  if (testResponses.length === 0) return null
+  const score = sswScoreFromResponses(testResponses)
+  const conds: ('RNC' | 'RC' | 'LC' | 'LNC')[] = ['RNC', 'RC', 'LC', 'LNC']
+  const verdict = score.raw_score_pct <= 10 ? { label: 'Normal', color: 'emerald' }
+    : score.raw_score_pct <= 16 ? { label: 'Limítrofe', color: 'amber' }
+    : { label: 'Bajo norma', color: 'red' }
+
+  return (
+    <Card className="mb-6 border-[var(--primary)]/30">
+      <CardHeader>
+        <CardTitle className="text-base flex items-center gap-2">
+          SSW · Staggered Spondaic Word
+          <Badge className={`bg-${verdict.color}-600 text-white`}>{verdict.label}</Badge>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+          {conds.map(c => {
+            const v = score.by_condition[c]
+            return (
+              <div key={c} className="rounded-lg border p-3 text-center">
+                <div className="text-[10px] uppercase text-[var(--muted-foreground)] font-bold">{c}</div>
+                <div className="text-2xl font-black mt-1">{v.error_pct.toFixed(1)}%</div>
+                <div className="text-xs text-[var(--muted-foreground)]">{v.total - v.correct}/{v.total} err</div>
+                <div className="h-1.5 bg-[var(--secondary)] rounded-full mt-1.5 overflow-hidden">
+                  <div className={cn('h-full', v.error_pct < 10 ? 'bg-emerald-500' : v.error_pct < 25 ? 'bg-amber-500' : 'bg-red-500')} style={{ width: `${Math.min(100, v.error_pct)}%` }} />
+                </div>
+              </div>
+            )
+          })}
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+          <div className="rounded-md border p-3">
+            <div className="text-xs text-[var(--muted-foreground)]">Raw score</div>
+            <div className="text-xl font-black">{score.total_errors}/{score.total_items}</div>
+            <div className="text-xs text-[var(--muted-foreground)]">{score.raw_score_pct.toFixed(1)}% errores</div>
+          </div>
+          <div className="rounded-md border p-3">
+            <div className="text-xs text-[var(--muted-foreground)]">Por oído</div>
+            <div className="text-xs">R: {score.by_ear.R.errors}/{score.by_ear.R.total}</div>
+            <div className="text-xs">L: {score.by_ear.L.errors}/{score.by_ear.L.total}</div>
+            <div className="text-xs font-bold mt-1">Ear effect: {score.ear_effect_pct.toFixed(1)}%</div>
+          </div>
+          <div className="rounded-md border p-3">
+            <div className="text-xs text-[var(--muted-foreground)]">Otros</div>
+            <div className="text-xs">Order effect: <b>{score.order_effect_pct.toFixed(1)}%</b></div>
+            <div className="text-xs">Reversals: <b>{score.reversals}</b></div>
+            <div className="text-xs">Bias: <b>{score.response_bias}</b></div>
+          </div>
+        </div>
+
+        {score.qualifiers.length > 0 && (
+          <div className="flex flex-wrap gap-1">
+            {score.qualifiers.map(q => (
+              <Badge key={q} variant="outline" className="text-[10px]">{q.replace(/_/g, ' ')}</Badge>
+            ))}
+          </div>
+        )}
+
+        <p className="text-[11px] text-[var(--muted-foreground)] italic">
+          Cortes indicativos (Katz 1998, 11–60 años): Normal ≤10% · Limítrofe 10–16% · Bajo norma &gt;16%. El pack puede ajustar por edad en &quot;Normativa clínica&quot;.
+        </p>
       </CardContent>
     </Card>
   )

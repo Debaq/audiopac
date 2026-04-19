@@ -1,6 +1,6 @@
 export type Ear = 'left' | 'right' | 'binaural'
 export type ResponseMode = 'verbal' | 'hummed' | 'manual'
-export type TestType = 'DPS' | 'PPS' | 'CUSTOM'
+export type TestType = 'DPS' | 'PPS' | 'CUSTOM' | 'SSW'
 export type SessionStatus = 'in_progress' | 'completed' | 'cancelled'
 export type Phase = 'practice' | 'test'
 
@@ -161,6 +161,7 @@ export interface TestConfig {
   dichotic_digits?: DichoticDigitsParams
   hint?: HINTParams
   matrix?: MatrixParams
+  ssw?: SSWParams
   family?: string
   /** Consigna al paciente, markdown, mostrada pre-start. */
   patient_instructions_md?: string
@@ -258,7 +259,7 @@ export interface SessionWithDetails extends TestSession {
   profile_name: string
 }
 
-export type StimulusCategory = 'srt' | 'discrimination' | 'dichotic_digits' | 'sentence' | 'matrix' | 'custom'
+export type StimulusCategory = 'srt' | 'discrimination' | 'dichotic_digits' | 'sentence' | 'matrix' | 'ssw' | 'custom'
 
 export interface StimulusList {
   id: number
@@ -328,6 +329,52 @@ export interface MatrixParams {
   min_snr_db: number
   max_snr_db: number
   max_total_trials?: number
+}
+
+export type SSWEarFirstOrder = 'RLRL' | 'LRLR' | 'RRLL' | 'random' | 'fixed_R' | 'fixed_L'
+
+export interface SSWParams {
+  /** Lista SSW con 160 hemispondees marcados en metadata.ssw_item/side/position. */
+  stimulus_list_code: string
+  /** Nivel presentación por canal, dB HL. Típico SRT+50. */
+  level_db: number
+  /** Ítems a presentar (default 40). */
+  num_items?: number
+  /** Cómo alternar ear-first por ítem. */
+  ear_first_order?: SSWEarFirstOrder
+  /** Mostrar pair_label al paciente (raro — sólo ensayo). */
+  show_pair_label?: boolean
+  /** ISI entre ítems, ms. */
+  iri_ms?: number
+}
+
+export interface SSWStimulusMeta {
+  ssw_item: number
+  side: 'R' | 'L'
+  position: 1 | 2
+  pair_label?: string
+}
+
+export interface SSWConditionScore {
+  correct: number
+  total: number
+  error_pct: number
+}
+
+export interface SSWScore {
+  total_errors: number
+  total_items: number
+  raw_score_pct: number
+  by_condition: Record<'RNC' | 'RC' | 'LC' | 'LNC', SSWConditionScore>
+  by_ear: { R: { errors: number; total: number }; L: { errors: number; total: number } }
+  /** (L_err − R_err) / total_per_ear * 100. Positivo = peor L. */
+  ear_effect_pct: number
+  /** ((RNC+LC) − (RC+LNC)) / total_per_cond. */
+  order_effect_pct: number
+  reversals: number
+  corrected_score_pct?: number
+  response_bias: 'none' | 'left' | 'right'
+  qualifiers: string[]
 }
 
 export interface Calibration {

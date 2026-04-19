@@ -108,6 +108,15 @@ export async function clearStimulusRecording(id: number): Promise<void> {
   )
 }
 
+export async function updateStimulusMetadata(id: number, metadata: Record<string, unknown> | null): Promise<void> {
+  const db = await getDb()
+  const json = metadata && Object.keys(metadata).length > 0 ? JSON.stringify(metadata) : null
+  await db.execute(
+    `UPDATE stimuli SET metadata_json=$1, updated_at=datetime('now') WHERE id=$2`,
+    [json, id]
+  )
+}
+
 export async function updateStimulusKeywords(id: number, keywords: string[] | null): Promise<void> {
   const db = await getDb()
   const json = keywords && keywords.length > 0 ? JSON.stringify(keywords) : null
