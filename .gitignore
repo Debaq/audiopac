@@ -52,3 +52,6 @@ src-tauri/gen/schemas/
 
 # Build output artifacts
 out/
+
+# Symlink al repo hermano audiopac-assets (no versionar)
+/assets
