@@ -46,7 +46,7 @@ export function HINTRun({ session, template, patient, params, preview = false }:
         ? items
         : items.filter(s => s.file_path && parseKeywords(s).length > 0)
       if (!preview && usable.length < params.sentences_per_level) {
-        setLoadError(`Lista "${list.name}" tiene ${usable.length} frases grabadas con palabras clave. Se requieren al menos ${params.sentences_per_level}. Revisá /estimulos.`)
+        setLoadError(`Lista "${list.name}" tiene ${usable.length} frases grabadas con palabras clave. Se requieren al menos ${params.sentences_per_level}. Revisa /estimulos.`)
         return
       }
       if (preview && usable.length === 0) {
@@ -222,7 +222,7 @@ export function HINTRun({ session, template, patient, params, preview = false }:
             <CardContent className="p-8">
               <div className="text-center mb-6">
                 <div className="text-xs uppercase tracking-widest text-[var(--muted-foreground)] mb-2">
-                  {pending ? 'Frase presentada — marcá palabras clave entendidas' : 'Próxima frase'}
+                  {pending ? 'Frase presentada — marca palabras clave entendidas' : 'Próxima frase'}
                 </div>
                 {pending ? (
                   <div className="flex flex-wrap gap-2 justify-center max-w-3xl mx-auto">

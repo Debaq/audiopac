@@ -231,7 +231,7 @@ export function TestEditorPage() {
     const returnTo = tid ? `/tests/${tid}` : `/tests`
     const target = `/estimulos?list=${encodeURIComponent(listCode)}&returnTo=${encodeURIComponent(returnTo)}`
     if (!tid && (!name.trim() || !code.trim())) {
-      alert('Guardá el test primero (completá nombre y código).')
+      alert('Guarda el test primero (completa nombre y código).')
       return
     }
     await save({ redirectTo: target })

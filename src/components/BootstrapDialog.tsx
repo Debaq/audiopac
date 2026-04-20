@@ -85,7 +85,7 @@ export function BootstrapDialog({ onDone }: { onDone: () => void }) {
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-2xl"><Package className="w-6 h-6" /> Bienvenido a AudioPAC</CardTitle>
           <CardDescription>
-            La app viene vacía. Elegí qué paquetes de pruebas instalar para empezar. Podrás cambiarlos después desde <span className="font-mono">Catálogos</span>.
+            La app viene vacía. Elige qué paquetes de pruebas instalar para empezar. Podrás cambiarlos después desde <span className="font-mono">Catálogos</span>.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -95,7 +95,7 @@ export function BootstrapDialog({ onDone }: { onDone: () => void }) {
               <div>
                 <p className="font-medium">No se pudo cargar el índice de paquetes</p>
                 <p className="mt-1 text-[var(--muted-foreground)]">{error}</p>
-                <p className="mt-1 text-[var(--muted-foreground)]">Podés continuar sin instalar y hacerlo luego desde Catálogos.</p>
+                <p className="mt-1 text-[var(--muted-foreground)]">Puedes continuar sin instalar y hacerlo luego desde Catálogos.</p>
               </div>
             </div>
           )}

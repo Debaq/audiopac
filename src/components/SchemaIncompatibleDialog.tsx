@@ -71,7 +71,7 @@ export function SchemaIncompatibleDialog() {
         </ul>
         <p style={{ margin: '0 0 24px', lineHeight: 1.5, color: '#ffd28e' }}>
           AudioPAC sigue en beta. La app se cerrará al aceptar.{' '}
-          <strong>Tenés que reabrirla manualmente</strong>; al hacerlo vas a
+          <strong>Tienes que reabrirla manualmente</strong>; al hacerlo vas a
           poder instalar packs oficiales desde <strong>/catalogos</strong>.
         </p>
         <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>

@@ -115,9 +115,9 @@ export function CalibrationPage() {
   }
 
   const saveNoisePoint = async () => {
-    if (!activeCal) { alert('Activá una calibración primero'); return }
+    if (!activeCal) { alert('Activa una calibración primero'); return }
     const m = Number(noiseMeasured)
-    if (!Number.isFinite(m)) { alert('Ingresá el dB SPL medido'); return }
+    if (!Number.isFinite(m)) { alert('Ingresa el dB SPL medido'); return }
     const mZ = noiseToZ(m, noiseWeighting, noiseType)
     const refDb = mZ - noiseDbfs
     await upsertNoisePoint({
@@ -183,9 +183,9 @@ export function CalibrationPage() {
   }
 
   const savePoint = async () => {
-    if (!activeCal) { alert('Creá o activá una calibración primero'); return }
+    if (!activeCal) { alert('Crea o activa una calibración primero'); return }
     const m = Number(measured)
-    if (!Number.isFinite(m)) { alert('Ingresá el dB SPL medido'); return }
+    if (!Number.isFinite(m)) { alert('Ingresa el dB SPL medido'); return }
     const mZ = toneToZ(m, toneWeighting, selFreq)
     const refDb = mZ - dbfs
     await upsertPoint({
@@ -270,7 +270,7 @@ export function CalibrationPage() {
       <Card className="mb-4">
         <CardHeader>
           <CardTitle>2. Crear nueva calibración</CardTitle>
-          <CardDescription>Un "set" contiene la curva completa. Creá y después agregá puntos.</CardDescription>
+          <CardDescription>Un "set" contiene la curva completa. Crea y después agrega puntos.</CardDescription>
         </CardHeader>
         <CardContent className="grid grid-cols-2 gap-4">
           <div>
@@ -298,7 +298,7 @@ export function CalibrationPage() {
           <CardHeader>
             <CardTitle>3. Agregar/editar puntos — {activeCal.label}</CardTitle>
             <CardDescription>
-              Seleccioná freq + oído, reproducí el tono, medí con sonómetro, guardá. Repetí 6 × 2 = 12 puntos.
+              Selecciona freq + oído, reproduce el tono, mide con sonómetro, guarda. Repite 6 × 2 = 12 puntos.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -428,8 +428,8 @@ export function CalibrationPage() {
           <CardHeader>
             <CardTitle>4. Calibración de ruido — {activeCal.label}</CardTitle>
             <CardDescription>
-              SPL real del ruido enmascarante (HINT, SinB, GIN, MLD). Reproducí cada tipo,
-              medí con sonómetro al mismo nivel interno y guardá. Sin esto, el motor estima
+              SPL real del ruido enmascarante (HINT, SinB, GIN, MLD). Reproduce cada tipo,
+              mide con sonómetro al mismo nivel interno y guarda. Sin esto, el motor estima
               ±3–5 dB usando RMS aproximado del buffer.
             </CardDescription>
           </CardHeader>

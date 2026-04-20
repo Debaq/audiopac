@@ -154,7 +154,7 @@ export function SSWConfigEditor({ value, onChange, disabled, onGoToRecord }: Pro
                   disabled={disabled}
                   className="flex-1"
                 >
-                  <option value="">— Elegí una lista SSW —</option>
+                  <option value="">— Elige una lista SSW —</option>
                   {lists.map(l => (
                     <option key={l.id} value={l.code}>{l.name} ({l.code})</option>
                   ))}
@@ -185,7 +185,7 @@ export function SSWConfigEditor({ value, onChange, disabled, onGoToRecord }: Pro
               )}
               {lists.length === 0 && (
                 <p className="text-[10px] text-[var(--muted-foreground)] mt-1">
-                  No hay listas SSW. Creá una nueva o instalá <code>ssw-es-v1</code> desde <code>/catalogos</code>.
+                  No hay listas SSW. Crea una nueva o instala <code>ssw-es-v1</code> desde <code>/catalogos</code>.
                 </p>
               )}
             </div>
@@ -385,13 +385,13 @@ export function SSWConfigEditor({ value, onChange, disabled, onGoToRecord }: Pro
 
                 {items.length === 0 && (
                   <p className="text-xs text-[var(--muted-foreground)] py-2">
-                    Lista vacía. Agregá 160 tokens en <code>/estímulos</code>.
+                    Lista vacía. Agrega 160 tokens en <code>/estímulos</code>.
                   </p>
                 )}
               </div>
             ) : (
               <div className="rounded-md border border-dashed border-[var(--border)] p-6 text-center text-xs text-[var(--muted-foreground)]">
-                Elegí o creá una lista SSW para asignar slots.
+                Elige o crea una lista SSW para asignar slots.
               </div>
             )}
           </div>

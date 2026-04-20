@@ -114,7 +114,7 @@ export function CatalogsPage() {
             <div>
               <p className="font-medium">No se pudo cargar el manifiesto</p>
               <p className="text-xs mt-1 text-[var(--muted-foreground)]">{error}</p>
-              <p className="text-xs mt-1 text-[var(--muted-foreground)]">Revisá conexión o permisos de red.</p>
+              <p className="text-xs mt-1 text-[var(--muted-foreground)]">Revisa conexión o permisos de red.</p>
             </div>
           </CardContent>
         </Card>
@@ -230,7 +230,7 @@ export function CatalogsPage() {
                   )}
                   {c.audio_packs.length === 0 && (
                     <p className="text-[10px] text-[var(--muted-foreground)] mt-2 flex items-center gap-1">
-                      <Mic className="w-3 h-3" /> Sin audios redistribuibles. Grabá voces propias en /estimulos.
+                      <Mic className="w-3 h-3" /> Sin audios redistribuibles. Graba voces propias en /estimulos.
                     </p>
                   )}
                 </CardContent>

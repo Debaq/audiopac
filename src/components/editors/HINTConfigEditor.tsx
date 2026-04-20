@@ -93,7 +93,7 @@ export function HINTConfigEditor({ value, onChange, disabled, onGoToRecord }: Pr
                   disabled={disabled}
                   className="flex-1"
                 >
-                  <option value="">— Elegí una lista de frases —</option>
+                  <option value="">— Elige una lista de frases —</option>
                   {lists.map(l => (
                     <option key={l.id} value={l.code}>
                       {l.name} ({l.code})
@@ -126,7 +126,7 @@ export function HINTConfigEditor({ value, onChange, disabled, onGoToRecord }: Pr
               )}
               {lists.length === 0 && (
                 <p className="text-[10px] text-[var(--muted-foreground)] mt-1">
-                  No hay listas de frases. Creá una nueva o instalá <code>hint-es-v1</code> / <code>sharvard-es-v1</code> desde <code>/catalogos</code>.
+                  No hay listas de frases. Crea una nueva o instala <code>hint-es-v1</code> / <code>sharvard-es-v1</code> desde <code>/catalogos</code>.
                 </p>
               )}
             </div>
@@ -247,7 +247,7 @@ export function HINTConfigEditor({ value, onChange, disabled, onGoToRecord }: Pr
 
                 {items.length === 0 ? (
                   <p className="text-xs text-[var(--muted-foreground)] py-2">
-                    Lista vacía. Agregá frases en <code>/estímulos</code>.
+                    Lista vacía. Agrega frases en <code>/estímulos</code>.
                   </p>
                 ) : (
                   <div className="space-y-1 max-h-[420px] overflow-y-auto">
@@ -283,7 +283,7 @@ export function HINTConfigEditor({ value, onChange, disabled, onGoToRecord }: Pr
               </div>
             ) : (
               <div className="rounded-md border border-dashed border-[var(--border)] p-6 text-center text-xs text-[var(--muted-foreground)]">
-                Elegí o creá una lista de frases para ver contenido y grabar.
+                Elige o crea una lista de frases para ver contenido y grabar.
               </div>
             )}
           </div>

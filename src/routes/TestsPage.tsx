@@ -385,7 +385,7 @@ export function TestsPage() {
       {filtered.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center text-sm text-[var(--muted-foreground)]">
-            {templates.length === 0 ? 'Sin tests aún.' : 'Sin coincidencias. Probá limpiar filtros.'}
+            {templates.length === 0 ? 'Sin tests aún.' : 'Sin coincidencias. Prueba limpiar filtros.'}
           </CardContent>
         </Card>
       ) : (
@@ -506,7 +506,7 @@ export function TestsPage() {
               />
             ) : (
               <div className="text-center text-sm text-[var(--muted-foreground)] py-16">
-                Seleccioná un test para ver su ficha
+                Selecciona un test para ver su ficha
               </div>
             )}
           </section>
@@ -523,7 +523,7 @@ export function TestsPage() {
             onClick={e => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-1">
-              <h2 className="text-lg font-bold">Elegí motor del test</h2>
+              <h2 className="text-lg font-bold">Elige motor del test</h2>
               <button
                 onClick={() => setEngineDialog(null)}
                 className="p-1 rounded hover:bg-[var(--secondary)]"

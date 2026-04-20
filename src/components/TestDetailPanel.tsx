@@ -239,7 +239,7 @@ export function TestDetailPanel({
           </div>
           {packReq === 'audio_pack' && (
             <p className="text-[10px] text-[var(--muted-foreground)] pl-6">
-              Este pack ofrece audios oficiales (ej. Sharvard-ES peninsular). Si preferís tu propia voz/dialecto, podés grabar los tokens vos mismo.
+              Este pack ofrece audios oficiales (ej. Sharvard-ES peninsular). Si prefieres tu propia voz/dialecto, puedes grabar los tokens tú mismo.
             </p>
           )}
         </div>

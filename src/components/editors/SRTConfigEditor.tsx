@@ -134,7 +134,7 @@ export function SRTConfigEditor({ value, onChange, disabled, onGoToRecord }: Pro
               disabled={disabled}
               className="flex-1"
             >
-              <option value="">— Elegí una lista SRT —</option>
+              <option value="">— Elige una lista SRT —</option>
               {lists.map(l => (
                 <option key={l.id} value={l.code}>
                   {l.name} ({l.code})
@@ -147,7 +147,7 @@ export function SRTConfigEditor({ value, onChange, disabled, onGoToRecord }: Pro
           </div>
           <div className="flex items-center justify-between mt-1">
             <p className="text-[10px] text-[var(--muted-foreground)]">
-              Creá una lista vacía y luego grabá tus propios bisílabos.
+              Crea una lista vacía y luego graba tus propios bisílabos.
             </p>
             {onGoToRecord && value.stimulus_list_code && (
               <button
@@ -271,7 +271,7 @@ export function SRTConfigEditor({ value, onChange, disabled, onGoToRecord }: Pro
 
             {!editable && items.length > 0 && (
               <p className="text-[10px] text-[var(--muted-foreground)]">
-                Lista estándar bloqueada. Si querés modificar palabras, creá una nueva con <b>+ Nueva</b> (podés seedearla copiando estas).
+                Lista estándar bloqueada. Si quieres modificar palabras, crea una nueva con <b>+ Nueva</b> (puedes seedearla copiando estas).
               </p>
             )}
 
@@ -407,7 +407,7 @@ export function SRTConfigEditor({ value, onChange, disabled, onGoToRecord }: Pro
 
             {items.length === 0 ? (
               <p className="text-xs text-[var(--muted-foreground)] py-2">
-                Lista vacía. {editable ? 'Agregá bisílabos arriba.' : ''}
+                Lista vacía. {editable ? 'Agrega bisílabos arriba.' : ''}
               </p>
             ) : (
               <div className="flex flex-wrap gap-1.5 max-h-48 overflow-y-auto">
@@ -447,7 +447,7 @@ export function SRTConfigEditor({ value, onChange, disabled, onGoToRecord }: Pro
 
         {!selectedList && (
           <div className="rounded-md border border-dashed border-[var(--border)] p-6 text-center text-xs text-[var(--muted-foreground)]">
-            Elegí o creá una lista para ver y editar las palabras.
+            Elige o crea una lista para ver y editar las palabras.
           </div>
         )}
         </div>

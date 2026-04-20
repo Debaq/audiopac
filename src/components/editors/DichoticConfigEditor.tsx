@@ -126,7 +126,7 @@ export function DichoticConfigEditor({ value, onChange, disabled, onGoToRecord }
               disabled={disabled}
               className="flex-1"
             >
-              <option value="">— Elegí una lista de dígitos —</option>
+              <option value="">— Elige una lista de dígitos —</option>
               {lists.map(l => (
                 <option key={l.id} value={l.code}>
                   {l.name} ({l.code})
@@ -159,7 +159,7 @@ export function DichoticConfigEditor({ value, onChange, disabled, onGoToRecord }
           )}
           {lists.length === 0 && (
             <p className="text-[10px] text-[var(--muted-foreground)] mt-1">
-              No hay listas. Creá una nueva (se cargan 8 dígitos semilla) o instalá <code>dichotic-digits-es-v1</code> desde <code>/catalogos</code>.
+              No hay listas. Crea una nueva (se cargan 8 dígitos semilla) o instala <code>dichotic-digits-es-v1</code> desde <code>/catalogos</code>.
             </p>
           )}
         </div>
@@ -237,7 +237,7 @@ export function DichoticConfigEditor({ value, onChange, disabled, onGoToRecord }
             <div className="border border-[var(--border)] rounded-md p-3 space-y-2">
               {tokens.length === 0 ? (
                 <p className="text-xs text-[var(--muted-foreground)]">
-                  Primero elegí una lista con tokens grabados para poder armar pares fijos.
+                  Primero elige una lista con tokens grabados para poder armar pares fijos.
                 </p>
               ) : (
                 <>
@@ -300,7 +300,7 @@ export function DichoticConfigEditor({ value, onChange, disabled, onGoToRecord }
                   </Button>
                   {fixedPairs.length !== value.num_pairs && (
                     <p className="text-[10px] text-amber-600">
-                      Tenés {fixedPairs.length} pares pero el parámetro <code>num_pairs</code> es {value.num_pairs}. Ajustá uno u otro.
+                      Tienes {fixedPairs.length} pares pero el parámetro <code>num_pairs</code> es {value.num_pairs}. Ajusta uno u otro.
                     </p>
                   )}
                 </>

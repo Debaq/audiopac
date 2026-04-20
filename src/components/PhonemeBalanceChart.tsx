@@ -433,7 +433,7 @@ function ArticulatorySection({ tokens }: { tokens: string[] }) {
             ))}
           </ul>
           {suggestions.length > 6 && (
-            <div className="text-[9px] text-[var(--muted-foreground)]">+{suggestions.length - 6} sugerencias más (ajustá las primeras y revisá el chart).</div>
+            <div className="text-[9px] text-[var(--muted-foreground)]">+{suggestions.length - 6} sugerencias más (ajusta las primeras y revisa el chart).</div>
           )}
         </div>
       )}

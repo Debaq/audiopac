@@ -62,7 +62,7 @@ export function SSWRun({ session, template, patient, params, preview = false }: 
         return
       }
       if (!preview && ctrl.readyItems() < ctrl.state.trials.length) {
-        setLoadError(`Sólo ${ctrl.readyItems()}/${ctrl.state.trials.length} ítems tienen las 4 grabaciones. Completá la lista antes de iniciar.`)
+        setLoadError(`Sólo ${ctrl.readyItems()}/${ctrl.state.trials.length} ítems tienen las 4 grabaciones. Completa la lista antes de iniciar.`)
         return
       }
       ctrlRef.current = ctrl

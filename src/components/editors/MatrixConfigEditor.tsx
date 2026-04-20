@@ -134,7 +134,7 @@ export function MatrixConfigEditor({ value, onChange, disabled, onGoToRecord }: 
                   disabled={disabled}
                   className="flex-1"
                 >
-                  <option value="">— Elegí una lista Matrix —</option>
+                  <option value="">— Elige una lista Matrix —</option>
                   {lists.map(l => (
                     <option key={l.id} value={l.code}>
                       {l.name} ({l.code})
@@ -167,7 +167,7 @@ export function MatrixConfigEditor({ value, onChange, disabled, onGoToRecord }: 
               )}
               {lists.length === 0 && (
                 <p className="text-[10px] text-[var(--muted-foreground)] mt-1">
-                  No hay listas Matrix. Creá una nueva o instalá <code>matrix-es-v1</code> desde <code>/catalogos</code>.
+                  No hay listas Matrix. Crea una nueva o instala <code>matrix-es-v1</code> desde <code>/catalogos</code>.
                 </p>
               )}
             </div>
@@ -288,7 +288,7 @@ export function MatrixConfigEditor({ value, onChange, disabled, onGoToRecord }: 
 
                 {!editable && (
                   <p className="text-[10px] text-[var(--muted-foreground)]">
-                    Lista estándar bloqueada. Duplicá si querés re-asignar columnas.
+                    Lista estándar bloqueada. Duplica si quieres re-asignar columnas.
                   </p>
                 )}
 
@@ -346,7 +346,7 @@ export function MatrixConfigEditor({ value, onChange, disabled, onGoToRecord }: 
 
                 {items.length === 0 && (
                   <p className="text-xs text-[var(--muted-foreground)] py-2">
-                    Lista vacía. Agregá palabras en <code>/estímulos</code>.
+                    Lista vacía. Agrega palabras en <code>/estímulos</code>.
                   </p>
                 )}
 
@@ -359,7 +359,7 @@ export function MatrixConfigEditor({ value, onChange, disabled, onGoToRecord }: 
               </div>
             ) : (
               <div className="rounded-md border border-dashed border-[var(--border)] p-6 text-center text-xs text-[var(--muted-foreground)]">
-                Elegí o creá una lista Matrix para asignar columnas.
+                Elige o crea una lista Matrix para asignar columnas.
               </div>
             )}
           </div>

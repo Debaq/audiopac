@@ -333,7 +333,7 @@ export function SRTRun({ session, template, patient, params, preview = false }: 
 
               <div className="flex gap-3 justify-center mb-6">
                 <Button size="xl" onClick={handlePlay} disabled={state.isPlaying || !!pending} className="min-w-[200px]">
-                  <Play className="w-5 h-5" /> {state.isPlaying ? 'Reproduciendo...' : pending ? 'Palabra lista — marcá respuesta' : 'Siguiente palabra'}
+                  <Play className="w-5 h-5" /> {state.isPlaying ? 'Reproduciendo...' : pending ? 'Palabra lista — marca respuesta' : 'Siguiente palabra'}
                   <Kbd className="ml-2 bg-white/20 border-white/30 text-white">Espacio</Kbd>
                 </Button>
               </div>

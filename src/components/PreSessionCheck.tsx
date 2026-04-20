@@ -121,7 +121,7 @@ export function PreSessionCheck({ onProceed, onCancel }: Props) {
           {failed && (
             <div className="space-y-3">
               <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/40 text-sm">
-                Respuesta incorrecta. Posible cambio de volumen / auriculares / mute. Revisá la configuración antes de continuar.
+                Respuesta incorrecta. Posible cambio de volumen / auriculares / mute. Revisa la configuración antes de continuar.
               </div>
               <div className="flex gap-2">
                 <Button variant="outline" onClick={retry} className="flex-1">Reintentar</Button>

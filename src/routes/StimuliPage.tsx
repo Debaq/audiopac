@@ -146,7 +146,7 @@ export function StimuliPage() {
   const removeList = async (id: number) => {
     const l = lists.find(x => x.id === id)
     if (!l) return
-    if (l.is_standard === 1) { alert('Listas estándar no se eliminan. Desactivala si no la querés ver.'); return }
+    if (l.is_standard === 1) { alert('Listas estándar no se eliminan. Desactívala si no la quieres ver.'); return }
     if (!confirm(`¿Eliminar lista "${l.name}" y todas sus grabaciones?`)) return
     const its = await listStimuli(id)
     for (const it of its) if (it.file_path) await removeStimulusFile(it.file_path).catch(() => {})
@@ -418,7 +418,7 @@ export function StimuliPage() {
 
                   {items.length === 0 ? (
                     <p className="text-sm text-[var(--muted-foreground)] py-4 text-center">
-                      Sin tokens. Agregá palabras arriba o editá la lista.
+                      Sin tokens. Agrega palabras arriba o edita la lista.
                     </p>
                   ) : (
                     <div className="space-y-1.5 flex-1 min-h-0 overflow-y-auto pr-1">
@@ -533,7 +533,7 @@ export function StimuliPage() {
           ) : (
             <Card>
               <CardContent className="pt-8 pb-8 text-center text-sm text-[var(--muted-foreground)]">
-                Seleccioná o creá una lista.
+                Selecciona o crea una lista.
               </CardContent>
             </Card>
           )}

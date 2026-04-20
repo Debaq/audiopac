@@ -85,7 +85,7 @@ export function InlineListCreator({ category, categoryLabel, seedTokens, onClose
           {seedTokens && seedTokens.length > 0 && (
             <div className="rounded-md bg-[var(--secondary)] p-2 text-xs">
               Se van a cargar <b>{seedTokens.length}</b> tokens semilla: {seedTokens.join(', ')}.
-              Luego podés grabarlos en <code>/estímulos</code>.
+              Luego puedes grabarlos en <code>/estímulos</code>.
             </div>
           )}
           {error && <div className="text-xs text-red-500">{error}</div>}

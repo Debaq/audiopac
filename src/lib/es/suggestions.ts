@@ -71,8 +71,8 @@ export function generateSuggestions({ stats, expectedManner, expectedPlace, expe
       diff,
       examples,
       text: direction === 'under'
-        ? `Faltan ${label} (${diff.toFixed(1)} pts). Agregá: ${examples.slice(0, 3).join(', ')}.`
-        : `Exceso de ${label} (+${diff.toFixed(1)} pts). Considerá reemplazar algunas.`,
+        ? `Faltan ${label} (${diff.toFixed(1)} pts). Agrega: ${examples.slice(0, 3).join(', ')}.`
+        : `Exceso de ${label} (+${diff.toFixed(1)} pts). Considera reemplazar algunas.`,
     })
   }
 
@@ -95,7 +95,7 @@ export function generateSuggestions({ stats, expectedManner, expectedPlace, expe
       diff,
       examples,
       text: direction === 'under'
-        ? `Faltan consonantes ${label} (${diff.toFixed(1)} pts). Agregá: ${examples.slice(0, 3).join(', ')}.`
+        ? `Faltan consonantes ${label} (${diff.toFixed(1)} pts). Agrega: ${examples.slice(0, 3).join(', ')}.`
         : `Exceso ${label} (+${diff.toFixed(1)} pts).`,
     })
   }
@@ -116,8 +116,8 @@ export function generateSuggestions({ stats, expectedManner, expectedPlace, expe
         diff,
         examples: direction === 'under' ? ['casa', 'mesa', 'pato', 'dedo', 'bola'] : ['carta', 'puerto', 'falso', 'tiempo', 'cinco'],
         text: direction === 'under'
-          ? `Pocas sílabas abiertas (${openPct.toFixed(0)}% vs ${expectedOpenPct}% esperado). Agregá palabras CV.CV: casa, mesa, pato.`
-          : `Demasiadas sílabas abiertas (${openPct.toFixed(0)}% vs ${expectedOpenPct}% esperado). Incluí palabras con coda: carta, puerto, cinco.`,
+          ? `Pocas sílabas abiertas (${openPct.toFixed(0)}% vs ${expectedOpenPct}% esperado). Agrega palabras CV.CV: casa, mesa, pato.`
+          : `Demasiadas sílabas abiertas (${openPct.toFixed(0)}% vs ${expectedOpenPct}% esperado). Incluye palabras con coda: carta, puerto, cinco.`,
       })
     }
   }
@@ -136,8 +136,8 @@ export function generateSuggestions({ stats, expectedManner, expectedPlace, expe
         diff: voicedPct - 58,
         examples: direction === 'under' ? ['mano', 'ronda', 'bola', 'nido', 'gol'] : ['taza', 'foco', 'chico', 'paso', 'sopa'],
         text: direction === 'under'
-          ? `Pocas sonoras (${voicedPct.toFixed(0)}%). Agregá /m/ /n/ /l/ /r/ /b/d/g/.`
-          : `Exceso de sonoras (${voicedPct.toFixed(0)}%). Sumá /p/ /t/ /k/ /f/ /s/ /ch/.`,
+          ? `Pocas sonoras (${voicedPct.toFixed(0)}%). Agrega /m/ /n/ /l/ /r/ /b/d/g/.`
+          : `Exceso de sonoras (${voicedPct.toFixed(0)}%). Suma /p/ /t/ /k/ /f/ /s/ /ch/.`,
       })
     }
   }

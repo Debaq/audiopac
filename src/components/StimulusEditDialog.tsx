@@ -126,7 +126,7 @@ export function StimulusEditDialog({ stimulus, onClose, onSaved }: Props) {
   const autoDetect = () => {
     if (!buffer) return
     const r = detectVadBoundsMs(buffer)
-    if (!r) { alert('No se detectó voz. Ajustá los cursores manualmente.'); return }
+    if (!r) { alert('No se detectó voz. Ajusta los cursores manualmente.'); return }
     setStartMs(Math.max(0, r.startMs))
     setEndMs(Math.min(totalMs, r.endMs))
   }

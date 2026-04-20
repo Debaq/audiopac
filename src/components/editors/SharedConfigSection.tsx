@@ -46,7 +46,7 @@ export function SharedConfigSection({ value, onChange, disabled }: Props) {
               rows={4}
               value={value.patient_instructions_md ?? ''}
               onChange={e => onChange({ ...value, patient_instructions_md: e.target.value })}
-              placeholder="# Instrucciones&#10;Vas a escuchar palabras. Repetí cada una..."
+              placeholder="# Instrucciones&#10;Vas a escuchar palabras. Repite cada una..."
               disabled={disabled}
               className="font-mono text-xs"
             />
@@ -80,7 +80,7 @@ export function SharedConfigSection({ value, onChange, disabled }: Props) {
                 rows={2}
                 value={fb.practice_text_md ?? ''}
                 onChange={e => setFb('practice_text_md', e.target.value)}
-                placeholder="Muy bien / Probá de nuevo"
+                placeholder="Muy bien / Prueba de nuevo"
                 disabled={disabled}
                 className="text-xs"
               />

@@ -48,7 +48,7 @@ export function MatrixRun({ session, template, patient, params, preview = false 
       const ctrl = new MatrixController(params, items, session.ear, session.ref_db_snapshot ?? undefined, curve, preview)
       if (!preview && !ctrl.columnsReady()) {
         const miss = ctrl.missingColumns()
-        setLoadError(`Faltan grabaciones en columna(s) ${miss.map(i => COLUMN_LABELS[i] ?? i).join(', ')}. Revisá /estimulos — cada palabra necesita metadata.column asignado.`)
+        setLoadError(`Faltan grabaciones en columna(s) ${miss.map(i => COLUMN_LABELS[i] ?? i).join(', ')}. Revisa /estimulos — cada palabra necesita metadata.column asignado.`)
         return
       }
       if (preview && !ctrl.columnsReady()) {
@@ -220,7 +220,7 @@ export function MatrixRun({ session, template, patient, params, preview = false 
             <CardContent className="p-6">
               <div className="text-center mb-4">
                 <div className="text-xs uppercase tracking-widest text-[var(--muted-foreground)] mb-1">
-                  {pending ? 'Marcá 1 palabra por columna que escuchaste' : 'Pulsá reproducir para una nueva frase'}
+                  {pending ? 'Marca 1 palabra por columna que escuchaste' : 'Pulsa reproducir para una nueva frase'}
                 </div>
                 {pending && (
                   <div className="text-xs text-[var(--muted-foreground)]">

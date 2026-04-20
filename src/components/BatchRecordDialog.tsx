@@ -256,7 +256,7 @@ export function BatchRecordDialog({ items, onClose, onSaved }: Props) {
           <div>
             <h2 className="text-lg font-bold">Grabar — {targetItems.length} token(s)</h2>
             <p className="text-xs text-[var(--muted-foreground)]">
-              Una sola toma. Leé cada palabra dejando ~300 ms de pausa entre ellas. El sistema auto-parte por silencios.
+              Una sola toma. Lee cada palabra dejando ~300 ms de pausa entre ellas. El sistema auto-parte por silencios.
             </p>
           </div>
           <button onClick={onClose} className="p-1 rounded hover:bg-[var(--secondary)]" disabled={phase === 'saving'}>
@@ -269,7 +269,7 @@ export function BatchRecordDialog({ items, onClose, onSaved }: Props) {
         {phase === 'idle' && (
           <div className="py-4 space-y-4">
             <p className="text-sm text-[var(--muted-foreground)]">
-              Presioná <b>Grabar</b> y leé los tokens en orden. Usá <b>Espacio</b> o <b>Siguiente</b> para avanzar el resaltado (es solo visual, no afecta el audio).
+              Presiona <b>Grabar</b> y lee los tokens en orden. Usa <b>Espacio</b> o <b>Siguiente</b> para avanzar el resaltado (es solo visual, no afecta el audio).
             </p>
             <div className="border border-[var(--border)] rounded-md p-3 space-y-2">
               <div className="text-xs font-medium">¿Qué grabar?</div>
@@ -365,7 +365,7 @@ export function BatchRecordDialog({ items, onClose, onSaved }: Props) {
               {mismatch && (
                 <span className="inline-flex items-center gap-1 text-amber-500">
                   <AlertTriangle className="w-3.5 h-3.5" />
-                  No coincide — re-grabá o marcá los faltantes.
+                  No coincide — re-graba o marca los faltantes.
                 </span>
               )}
             </div>
