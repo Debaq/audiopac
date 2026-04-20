@@ -1,0 +1,47 @@
+{
+  "title": "AudioPAC: Open-source software for Central Auditory Processing assessment and speech audiometry",
+  "description": "AudioPAC is a cross-platform desktop application (Linux/Windows) built with Tauri v2 for clinical assessment of Central Auditory Processing Disorder (CAPD) and speech audiometry. It provides a test engine, recorder and calibration system. Tests, stimulus lists and clinical content are distributed as installable packages from the audiopac-assets repository. UI and clinical content are primarily in Spanish.\n\n---\n\nAudioPAC es una aplicación multiplataforma (Linux/Windows) construida con Tauri v2 para evaluación clínica del Procesamiento Auditivo Central (PAC) y logoaudiometría. Incluye motor de tests, grabador y sistema de calibración. Los tests, listas de estímulos y contenido clínico se distribuyen como paquetes instalables desde el repositorio audiopac-assets.",
+  "upload_type": "software",
+  "license": "MIT",
+  "access_right": "open",
+  "creators": [
+    {
+      "name": "Baier Quezada, Nicolás",
+      "affiliation": "Universidad Austral de Chile",
+      "orcid": "0000-0003-2818-0990"
+    },
+    {
+      "name": "Uribe, Vanessa",
+      "affiliation": "Universidad Austral de Chile",
+      "orcid": "0009-0003-0795-7921"
+    }
+  ],
+  "keywords": [
+    "audiology",
+    "central auditory processing",
+    "CAPD",
+    "speech audiometry",
+    "logoaudiometry",
+    "hearing assessment",
+    "clinical software",
+    "tauri",
+    "open source",
+    "accessibility"
+  ],
+  "communities": [
+    {"identifier": "zenodo"}
+  ],
+  "related_identifiers": [
+    {
+      "identifier": "https://github.com/Debaq/audiopac",
+      "relation": "isSupplementTo",
+      "resource_type": "software"
+    },
+    {
+      "identifier": "https://github.com/Debaq/audiopac-assets",
+      "relation": "requires",
+      "resource_type": "software"
+    }
+  ],
+  "language": "spa"
+}
