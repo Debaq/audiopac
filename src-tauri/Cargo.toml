@@ -1,6 +1,6 @@
 [package]
 name = "audiopac"
-version = "0.5.0"
+version = "0.5.1"
 description = "AudioPAC - Software para evaluación del Procesamiento Auditivo Central"
 authors = ["AudioPAC Team"]
 license = "MIT"
