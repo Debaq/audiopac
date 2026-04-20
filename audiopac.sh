@@ -435,6 +435,65 @@ with open(p, 'w') as f: f.write(s)
     fi
 }
 
+# ── Purga CDN jsdelivr (assets) ──────────────────────────────────────────────
+ASSETS_REPO_SLUG="Debaq/audiopac-assets"
+ASSETS_BRANCH_SLUG="main"
+
+cmd_purge_cdn() {
+    header "Purgar cache jsdelivr ($ASSETS_REPO_SLUG@$ASSETS_BRANCH_SLUG)"
+    if ! command -v curl &>/dev/null; then
+        error "curl no instalado"
+        return 1
+    fi
+
+    echo -e "  ${GREEN}1${NC}) Solo index.json        ${DIM}(rápido, uso común tras publicar pack)${NC}"
+    echo -e "  ${YELLOW}2${NC}) index.json + todos los packs/*.json"
+    echo -e "  ${BLUE}3${NC}) Path custom             ${DIM}(ej: catalogs/sharvard-es-v1.json)${NC}"
+    echo -e "  ${DIM}0) cancelar${NC}"
+    echo ""
+    read -rp "Opcion: " opt
+
+    local paths=()
+    case "$opt" in
+        1) paths=("index.json") ;;
+        2)
+            paths=("index.json")
+            local pkdir="$PROJECT_DIR/assets/packs"
+            if [[ -d "$pkdir" ]]; then
+                for f in "$pkdir"/*.json; do
+                    [[ -f "$f" ]] && paths+=("packs/$(basename "$f")")
+                done
+            else
+                warn "No se encontro $pkdir; purgando solo index.json"
+            fi
+            ;;
+        3)
+            read -rp "Path (relativo al repo assets): " custom
+            [[ -z "$custom" ]] && { info "Cancelado"; return 0; }
+            paths=("$custom")
+            ;;
+        0|"") info "Cancelado"; return 0 ;;
+        *) error "Opcion no valida"; return 1 ;;
+    esac
+
+    local base="https://purge.jsdelivr.net/gh/$ASSETS_REPO_SLUG@$ASSETS_BRANCH_SLUG"
+    local ok=0 fail=0
+    for p in "${paths[@]}"; do
+        info "Purgando $p ..."
+        local resp
+        resp=$(curl -sS --max-time 15 "$base/$p" 2>&1)
+        if echo "$resp" | grep -q '"status": *"finished"'; then
+            success "$p"
+            ok=$((ok + 1))
+        else
+            error "$p → $resp"
+            fail=$((fail + 1))
+        fi
+    done
+    echo ""
+    success "$ok OK · $fail fallos"
+}
+
 # ══════════════════════════════════════════════════════════════════════════════
 # ── MENU INTERACTIVO ─────────────────────────────────────────────────────────
 # ══════════════════════════════════════════════════════════════════════════════
@@ -477,6 +536,9 @@ show_menu() {
     echo -e "${BOLD} RELEASE${NC}"
     echo -e "  ${MAGENTA}13${NC}) Nuevo release     ${DIM}Bump version + tag + push + GH Actions${NC}"
     echo ""
+    echo -e "${BOLD} ASSETS / CDN${NC}"
+    echo -e "  ${CYAN}14${NC}) Purgar cache CDN  ${DIM}jsdelivr: index.json / packs${NC}"
+    echo ""
     echo -e "  ${BOLD}0${NC})  Salir"
     echo ""
 }
@@ -503,6 +565,7 @@ menu_loop() {
             11) cmd_db_reset;       pause_after ;;
             12) cmd_clean;          pause_after ;;
             13) cmd_release;        pause_after ;;
+            14) cmd_purge_cdn;      pause_after ;;
             0|q|salir) echo -e "\n${GREEN}Hasta luego${NC}"; exit 0 ;;
             "") ;;
             *)  error "Opcion no valida: $choice"; sleep 1 ;;
@@ -559,6 +622,7 @@ cmd_help() {
     echo "  db:reset       Borrar base de datos local"
     echo "  clean          Limpiar dist/ + cargo clean"
     echo "  release        Nuevo release (bump + tag + push + GH Actions)"
+    echo "  purge-cdn      Purgar cache jsdelivr (index.json / packs)"
     echo "  setup-hooks    Instalar git hooks versionados en .git/hooks"
     echo "  help           Esta ayuda"
 }
@@ -586,6 +650,7 @@ main() {
         db:reset)       cmd_db_reset ;;
         clean)          cmd_clean ;;
         release)        cmd_release ;;
+        purge-cdn)      cmd_purge_cdn ;;
         setup-hooks)    cmd_setup_hooks ;;
         help|--help|-h) cmd_help ;;
         *)              error "Comando desconocido: $1"; cmd_help; exit 1 ;;
