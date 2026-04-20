@@ -1,10 +1,14 @@
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
-import { Users, Activity, Settings2, FileText, LogOut, Home, AudioLines, Gauge, AlertTriangle, CheckCircle2, Mic, Package, Download, Map } from 'lucide-react'
+import { Users, Activity, Settings2, FileText, LogOut, Home, AudioLines, Gauge, AlertTriangle, CheckCircle2, Mic, Package, Download, Map, Loader2 } from 'lucide-react'
 import { useAuth } from '@/stores/auth'
 import { useCalibrationStore } from '@/stores/calibration'
 import { usePackUpdatesStore } from '@/stores/packUpdates'
 import { CommandPalette } from '@/components/CommandPalette'
 import { cn } from '@/lib/utils'
+import { roadmapStats } from '@/lib/roadmapData'
+
+const roadmapInProgressCount = roadmapStats.inProgress + roadmapStats.partial
+const roadmapInProgressFilter = roadmapInProgressCount > 0 ? '?filter=parcial' : ''
 
 const navItems = [
   { to: '/dashboard', label: 'Inicio', icon: Home },
@@ -105,6 +109,23 @@ export function AppLayout() {
                 {packUpdates.length === 1
                   ? '1 paquete con actualización'
                   : `${packUpdates.length} paquetes con actualizaciones`}
+              </span>
+            </Link>
+          </div>
+        )}
+
+        {roadmapInProgressCount > 0 && (
+          <div className="px-3 pb-2">
+            <Link
+              to={`/roadmap${roadmapInProgressFilter}`}
+              className="flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs border bg-sky-500/5 border-sky-500/30 text-sky-700 dark:text-sky-400 hover:bg-sky-500/10 transition-colors"
+              title={`${roadmapInProgressCount} funciones del roadmap en curso o parciales`}
+            >
+              <Loader2 className="w-3.5 h-3.5 shrink-0" />
+              <span className="truncate">
+                {roadmapInProgressCount === 1
+                  ? '1 función en curso'
+                  : `${roadmapInProgressCount} funciones en curso`}
               </span>
             </Link>
           </div>

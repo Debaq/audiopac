@@ -9,8 +9,8 @@ import type { Patient, TestTemplateParsed, SessionWithDetails } from '@/types'
 import type { InstalledPack } from '@/lib/packs/installer'
 import { cn } from '@/lib/utils'
 import { formatDate } from '@/lib/utils'
-import roadmapRaw from '../../docs/ROADMAP_PAC.md?raw'
-import { parseRoadmap, STATUS_META } from '@/lib/roadmapParser'
+import { STATUS_META } from '@/lib/roadmapParser'
+import { roadmapParsed } from '@/lib/roadmapData'
 
 type Item =
   | { kind: 'patient'; id: number; title: string; sub: string }
@@ -19,7 +19,7 @@ type Item =
   | { kind: 'pack'; code: string; title: string; sub: string }
   | { kind: 'roadmap'; id: string; title: string; sub: string }
 
-const ROADMAP_INDEX = parseRoadmap(roadmapRaw).all
+const ROADMAP_INDEX = roadmapParsed.all
 
 function norm(s: string): string {
   return s.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '')

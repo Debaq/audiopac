@@ -3,8 +3,8 @@ import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { ChevronRight, Search, Link2, ExternalLink } from 'lucide-react'
-import roadmapRaw from '../../docs/ROADMAP_PAC.md?raw'
-import { parseRoadmap, globalStats, slugify, STATUS_META, type RoadmapSection } from '@/lib/roadmapParser'
+import { slugify, STATUS_META, type RoadmapSection } from '@/lib/roadmapParser'
+import { roadmapSource as roadmapRaw, roadmapParsed, roadmapStats } from '@/lib/roadmapData'
 import { cn } from '@/lib/utils'
 
 type FilterKey = 'all' | 'done' | 'pending' | 'in_progress' | 'partial' | 'blocked'
@@ -82,8 +82,8 @@ function buildFilteredMd(
 }
 
 export function RoadmapPage() {
-  const parsed = useMemo(() => parseRoadmap(roadmapRaw), [])
-  const stats = useMemo(() => globalStats(parsed), [parsed])
+  const parsed = roadmapParsed
+  const stats = roadmapStats
   const [searchParams, setSearchParams] = useSearchParams()
   const location = useLocation()
   const navigate = useNavigate()
