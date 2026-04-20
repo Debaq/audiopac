@@ -3,6 +3,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 [![Tauri](https://img.shields.io/badge/Tauri-v2-24C8D8.svg)](https://tauri.app)
 [![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20Windows-lightgrey)](https://github.com/Debaq/audiopac/releases)
+[![DOI](https://zenodo.org/badge/1213560537.svg)](https://doi.org/10.5281/zenodo.19663724)
 
 **Software open-source multiplataforma para evaluación del Procesamiento Auditivo Central (PAC) y logoaudiometría.**
 
